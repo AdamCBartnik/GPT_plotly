@@ -7,10 +7,14 @@ from .tools import *
 from .nicer_units import *
 from .postprocess import postprocess_screen
 from pmd_beamphysics.units import c_light, e_charge
-from pmd_beamphysics import ParticleGroup
+from .ParticleGroupExtension import ParticleGroupExtension, convert_gpt_data, divide_particles
 from ipywidgets import HBox
 
-def gpt_plot(gpt_data, var1, var2, units=None, fig=None, **params):
+def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data=True, **params):
+    if (format_input_data):
+        gpt_data = convert_gpt_data(gpt_data_input)
+    else:
+        gpt_data = gpt_data_input
     
     fig = make_default_plot(fig, plot_width=600, plot_height=400, **params)
     
@@ -108,24 +112,32 @@ def gpt_plot(gpt_data, var1, var2, units=None, fig=None, **params):
     return fig
     
 
+    
+    
 
-def gpt_plot_dist1d(pmd, var, ptype='charge', units=None, fig=None, table_fig=None, table_on=True, **params):
-    
-    ptype = ptype.lower()
-    
+def gpt_plot_dist1d(pmd, var, plot_type='charge', units=None, fig=None, table_fig=None, table_on=True, **params):
+    screen_key = None
+    screen_value = None
+    if (isinstance(pmd, GPT)):
+        pmd, screen_key, screen_value = get_screen_data(pmd, **params)
+    if (not isinstance(pmd, ParticleGroupExtension)):
+        pmd = ParticleGroupExtension(input_particle_group=pmd)
+    pmd = postprocess_screen(pmd, **params)
+                
+    plot_type = plot_type.lower()
     density_types = {'charge'}
     is_density = False
-    if (ptype in density_types):
+    if (plot_type in density_types):
         is_density = True
         
     positive_types = {'charge', 'norm_emit', 'sigma', 'slice'}
     is_positive = False
-    if any([d in ptype for d in positive_types]):
+    if any([d in plot_type for d in positive_types]):
         is_positive = True
         
     min_particles = 1
     needs_many_particles_types = {'norm_emit', 'sigma'}
-    if any([d in ptype for d in positive_types]):
+    if any([d in plot_type for d in positive_types]):
         min_particles = 3
         
     if (table_on):
@@ -138,12 +150,6 @@ def gpt_plot_dist1d(pmd, var, ptype='charge', units=None, fig=None, table_fig=No
     mpl_cmap = mpl.pyplot.get_cmap('Set1') # 'Set1', 'tab10'
     cmap = ["#%02x%02x%02x" % (int(r), int(g), int(b)) for r, g, b, _ in 255*mpl_cmap(range(mpl_cmap.N))]
     
-    screen_key = None
-    screen_value = None
-    if (isinstance(pmd, GPT)):
-        pmd, screen_key, screen_value = get_screen_data(pmd, **params)
-    pmd = postprocess_screen(pmd, **params)
-            
     if('nbins' in params):
         nbins = params['nbins']
     else:
@@ -170,10 +176,10 @@ def gpt_plot_dist1d(pmd, var, ptype='charge', units=None, fig=None, table_fig=No
         edges = edges - mean_x*mean_x_scale
     edges = edges/x_scale
     
-    ptype_base_units = pmd.units(ptype).unitSymbol
-    _, ptype_scale, ptype_prefix = nicer_array(pmd[ptype])
-    ptype_units = check_mu(ptype_prefix)+ptype_base_units
-    norm = 1.0/ptype_scale
+    plot_type_base_units = pmd.units(plot_type).unitSymbol
+    _, plot_type_scale, plot_type_prefix = nicer_array(pmd[plot_type])
+    plot_type_units = check_mu(plot_type_prefix)+plot_type_base_units
+    norm = 1.0/plot_type_scale
     if (is_density):
         norm = norm*density_norm
     
@@ -181,7 +187,7 @@ def gpt_plot_dist1d(pmd, var, ptype='charge', units=None, fig=None, table_fig=No
     hist = np.array([0.0 for p in p_list])
     for p_i, p in enumerate(p_list):
         if (p.n_particle >= min_particles):
-            hist[p_i] = p[ptype.lower()]*norm
+            hist[p_i] = p[plot_type]*norm
             weights[p_i] = p['charge']
     weights = weights/np.sum(weights)
     avg_hist = np.sum(hist*weights)
@@ -200,16 +206,16 @@ def gpt_plot_dist1d(pmd, var, ptype='charge', units=None, fig=None, table_fig=No
     
     fig.update_xaxes(title_text=f"${format_label(var)} \, ({x_units})$")
     
-    ptype_label = get_y_label([ptype])
+    plot_type_label = get_y_label([plot_type])
     if (is_positive):
         fig.update_yaxes(range=[0, 1.1*np.max(hist)])  
     if (is_density):
         if (var == 'r'):
-            y_axis_label=f"${ptype_label} \, \mbox{{density}} \, ({ptype_units}/{x_units}^2)$"
+            y_axis_label=f"${plot_type_label} \, \mbox{{density}} \, ({plot_type_units}/{x_units}^2)$"
         else:
-            y_axis_label=f"${ptype_label} \, \mbox{{density}} \, ({ptype_units}/{x_units})$"
+            y_axis_label=f"${plot_type_label} \, \mbox{{density}} \, ({plot_type_units}/{x_units})$"
     else:
-        y_axis_label=f"${ptype_label} \, ({ptype_units})$"
+        y_axis_label=f"${plot_type_label} \, ({plot_type_units})$"
     
     fig.update_yaxes(title_text=y_axis_label)
     
@@ -218,16 +224,16 @@ def gpt_plot_dist1d(pmd, var, ptype='charge', units=None, fig=None, table_fig=No
     if(table_on):
         x_units = format_label(x_units, latex=False)
         mean_x_units = format_label(mean_x_units, latex=False)
-        ptype_units = format_label(ptype_units, latex=False)
+        plot_type_units = format_label(plot_type_units, latex=False)
         q_units = format_label(q_units, latex=False)
         var_label = format_label(var, add_underscore=False)
-        ptype_label = format_label(ptype, add_underscore=False, latex=False)
+        plot_type_label = format_label(plot_type, add_underscore=False, latex=False)
         data = dict(col1=[], col2=[], col3=[])
         if (screen_key is not None):
             data = add_row(data, col1=f'Screen {screen_key}', col2=f'{screen_value:G}', col3='')
         data = add_row(data, col1=f'Total charge', col2=f'{q_total:G}', col3=f'{q_units}')
         if (not is_density):
-            data = add_row(data, col1=f'Mean {ptype_label}', col2=f'{avg_hist:G}', col3=f'{ptype_units}')
+            data = add_row(data, col1=f'Mean {plot_type_label}', col2=f'{avg_hist:G}', col3=f'{plot_type_units}')
         data = add_row(data, col1=f'Mean {var_label}', col2=f'{mean_x:G}', col3=f'{mean_x_units}')
         data = add_row(data, col1=f'σ_{var_label}', col2=f'{stdx:G}', col3=f'{x_units}')
         headers = dict(col1='Name', col2='Value', col3='Units')
@@ -238,18 +244,24 @@ def gpt_plot_dist1d(pmd, var, ptype='charge', units=None, fig=None, table_fig=No
     else:
         return fig
 
-def gpt_plot_dist2d(pmd, var1, var2, ptype='hist2d', units=None, fig=None, table_fig=None, table_on=True, **params):
+    
+    
+    
+    
+def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None, table_fig=None, table_on=True, **params):
 
     if (table_on):
         fig = make_default_plot(fig, plot_width=500, plot_height=400, **params)
         table_fig = make_default_plot(table_fig, plot_width=400, plot_height=400, is_table=True, **params)
     else:
         fig = make_default_plot(fig, plot_width=500, plot_height=400, **params)
-         
+    
     screen_key = None
     screen_value = None
     if (isinstance(pmd, GPT)):
         pmd, screen_key, screen_value = get_screen_data(pmd, **params)
+    if (not isinstance(pmd, ParticleGroupExtension)):
+        pmd = ParticleGroupExtension(input_particle_group=pmd)
     pmd = postprocess_screen(pmd, **params)
             
     if('axis' in params and params['axis']=='equal'):
@@ -287,12 +299,12 @@ def gpt_plot_dist2d(pmd, var1, var2, ptype='hist2d', units=None, fig=None, table
     (x, x_units, x_scale, avgx, avgx_units, avgx_scale) = scale_mean_and_get_units(getattr(pmd, var1), pmd.units(var1).unitSymbol, subtract_mean= not is_radial_var[0], weights=q)
     (y, y_units, y_scale, avgy, avgy_units, avgy_scale) = scale_mean_and_get_units(getattr(pmd, var2), pmd.units(var2).unitSymbol, subtract_mean= not is_radial_var[1], weights=q)
                 
-    if(ptype=="scatter"):
+    if(plot_type=="scatter"):
         color_var = 'density'
         if ('color_var' in params):
             color_var = params['color_var']
         fig.add_trace(scatter_color(fig, pmd, x, y, color_var=color_var, bins=nbins, weights=q, colormap=colormap, is_radial_var=is_radial_var))
-    if(ptype=="hist2d"):
+    if(plot_type=="histogram"):
         fig.add_trace(hist2d(fig, x, y, bins=nbins, weights=q, colormap=colormap, is_radial_var=is_radial_var))
                 
     fig.update_xaxes(title_text=f"${format_label(var1)} \, ({x_units})$")

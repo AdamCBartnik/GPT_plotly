@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib as mpl
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
-from pmd_beamphysics import ParticleGroup
 from .nicer_units import *
 
 def get_dist_plot_type(dist_y):
@@ -444,51 +443,3 @@ def add_row(data, **params):
     return data
 
 
-
-def divide_particles(particle_group, nbins = 100, key='t'):
-    """
-    Splits a particle group into even slices of 'key'. Returns a list of particle groups. 
-    """
-    x = getattr(particle_group, key) 
-    
-    if (key == 'r'):
-        x = x*x
-        xmin = 0  # force r=0 as min, could use min(x) here, optionally
-        xmax = max(x)
-        dx = (xmax-xmin)/(nbins-1)
-        edges = np.linspace(xmin, xmax + 0.01*dx, nbins+1) # extends slightly further than max(r2)
-        dx = edges[1]-edges[0]
-    else:
-        dx = (max(x)-min(x))/(nbins-1)
-        edges = np.linspace(min(x) - 0.01*dx, max(x) + 0.01*dx, nbins+1) # extends slightly further than range(r2)
-        dx = edges[1]-edges[0]
-    
-    which_bins = np.digitize(x, edges)-1
-    
-    if (key == 'r'):
-        x = np.sqrt(x)
-        edges = np.sqrt(edges)
-            
-    # Split particles
-    plist = []
-    for bin_i in range(nbins):
-        chunk = which_bins==bin_i
-        # Prepare data
-        data = {}
-        #keys = ['x', 'px', 'y', 'py', 'z', 'pz', 't', 'status', 'weight'] 
-        for k in particle_group._settable_array_keys:
-            data[k] = getattr(particle_group, k)[chunk]
-        # These should be scalars
-        data['species'] = particle_group.species
-        
-        # New object
-        p = ParticleGroup(data=data)
-        plist.append(p)
-    
-    # normalization for sums of particle properties, = 1 / histogram bin width
-    if (key == 'r'):
-        density_norm = 1.0/(np.pi*(edges[1]**2 - edges[0]**2))
-    else:
-        density_norm = 1.0/(edges[1] - edges[0])
-    
-    return plist, edges, density_norm

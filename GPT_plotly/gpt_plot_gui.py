@@ -1,19 +1,15 @@
 import numpy as np
-import matplotlib as mpl
-import copy
-from gpt.gpt import GPT as GPT
 import plotly.graph_objects as go
-from .tools import *
-from .nicer_units import *
 from .gpt_plot import *
-from pmd_beamphysics.units import c_light, e_charge
+from .ParticleGroupExtension import convert_gpt_data
 import ipywidgets as widgets
 
 
-def gpt_plot_gui(gpt_data):
+def gpt_plot_gui(gpt_data_input):
+    gpt_data = convert_gpt_data(gpt_data_input)
     screen_z_list = gpt_data.stat('mean_z', 'screen').tolist()
     
-    figure_hbox = HBox()
+    figure_hbox = widgets.HBox()
     tab_panel = widgets.Tab()
     
     # Layouts
@@ -27,8 +23,8 @@ def gpt_plot_gui(gpt_data):
     plottype_list = ['Trends', '1D Distribution', '2D Distribution']
     plottype_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(plottype_list)], value=0)
     
-    dist2d_type_dropdown = widgets.Dropdown(options=[('Scatter', 'scatter'), ('Histogram', 'hist2d')], 
-                                            value='hist2d', layout=layout_150px)
+    dist2d_type_dropdown = widgets.Dropdown(options=[('Scatter', 'scatter'), ('Histogram', 'histogram')], 
+                                            value='histogram', layout=layout_150px)
     scatter_color = ['density','t','x','y','r','px','py','pz','pr']
     scatter_color_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(scatter_color)], value=0, layout=layout_150px)
     
@@ -147,7 +143,7 @@ def gpt_plot_gui(gpt_data):
                 params['remove_correlation'] = (remove_correlation_var1, remove_correlation_var2, remove_correlation_n)
             if (take_slice):
                 params['take_slice'] = (take_slice_var, take_slice_index, take_slice_nslices)
-            figure_hbox.children += (gpt_plot_dist1d(gpt_data, dist_x_1d, screen_z=screen_z, ptype=ptype_1d,
+            figure_hbox.children += (gpt_plot_dist1d(gpt_data, dist_x_1d, screen_z=screen_z, plot_type=ptype_1d,
                                                          nbins=nbins_1d, **params), )
         if (is_dist2d):
             if (tab_panel.selected_index < 3):
@@ -162,7 +158,7 @@ def gpt_plot_gui(gpt_data):
                 params['remove_correlation'] = (remove_correlation_var1, remove_correlation_var2, remove_correlation_n)
             if (take_slice):
                 params['take_slice'] = (take_slice_var, take_slice_index, take_slice_nslices)
-            figure_hbox.children += (gpt_plot_dist2d(gpt_data, dist_x, dist_y, screen_z=screen_z, ptype=ptype, 
+            figure_hbox.children += (gpt_plot_dist2d(gpt_data, dist_x, dist_y, screen_z=screen_z, plot_type=ptype, 
                                                          nbins=nbins, **params), )
             
             
@@ -249,23 +245,17 @@ def gpt_plot_gui(gpt_data):
         tab_panel.set_title(i, t)
     
     tools_panel = widgets.VBox([
-        HBox([widgets.Label('Plot Type', layout=label_layout), plottype_dropdown]),
+        widgets.HBox([widgets.Label('Plot Type', layout=label_layout), plottype_dropdown]),
         tab_panel
     ])
     
     # Create layout of buttons and plot
     gui = widgets.HBox([
         tools_panel,
-        HBox([], layout=layout_20px),
+        widgets.HBox([], layout=layout_20px),
         figure_hbox
     ], layout={'border': '1px solid grey'})
     
-    #gui = widgets.HBox([
-    #    figure_hbox,
-    #    HBox([], layout=layout_20px),
-    #    tools_panel
-    #], layout={'border': '1px solid grey'})
-
     # Force the plot redraw function to be called once at start
     make_plot()
     

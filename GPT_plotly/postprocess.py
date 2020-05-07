@@ -1,27 +1,28 @@
 import numpy as np
 import copy
-from pmd_beamphysics import ParticleGroup
+from .ParticleGroupExtension import divide_particles
 import numpy.polynomial.polynomial as poly
-from .tools import divide_particles
 
 def postprocess_screen(screen, **params):
     
+    need_copy_params = ['take_slice', 'cylindrical_copies', 'remove_correlation']
+    need_copy = any([p in params for p in need_copy_params])
+    if (need_copy):
+        screen = copy.deepcopy(screen)
+        
     if ('take_slice' in params):
         (take_slice_var, slice_index, n_slices) = params['take_slice']
-        if (n_slices > 0):
-            screen = copy.deepcopy(screen)
+        if (n_slices > 1):
             screen = take_slice(screen, take_slice_var, slice_index, n_slices)
             
     if ('cylindrical_copies' in params):
         cylindrical_copies_n = params['cylindrical_copies']
         if (cylindrical_copies_n > 0):
-            screen = copy.deepcopy(screen)
             screen = add_cylindrical_copies(screen, params['cylindrical_copies'])
                
     if ('remove_correlation' in params):
         (remove_correlation_var1, remove_correlation_var2, remove_correlation_n) = params['remove_correlation']
         if (remove_correlation_n >= 0):
-            screen = copy.deepcopy(screen)
             screen = remove_correlation(screen, remove_correlation_var1, remove_correlation_var2, remove_correlation_n)
         
     return screen
