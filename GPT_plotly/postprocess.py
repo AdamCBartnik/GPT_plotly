@@ -1,6 +1,6 @@
 import numpy as np
 import copy
-from .ParticleGroupExtension import divide_particles
+from .ParticleGroupExtension import ParticleGroupExtension, divide_particles
 import numpy.polynomial.polynomial as poly
 
 def postprocess_screen(screen, **params):
@@ -96,6 +96,6 @@ def add_cylindrical_copies(screen, n_copies):
         weight=weight
     )
     
-    return ParticleGroup(data=data)
+    return ParticleGroupExtension(data=data)
 
 

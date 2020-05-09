@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib as mpl
-from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from .nicer_units import *
 
@@ -64,6 +63,7 @@ def format_label(s, latex=True, use_base=False, add_underscore=True):
         s = s.replace('norm_emit', '\epsilon')
         s = s.replace('emit', '\epsilon')
         s = s.replace('4d','{4d}')
+        s = s.replace('charge','\mbox{charge }')
     else:
         s = s.replace('\sigma','sigma')
         s = s.replace('\theta', 'theta')
@@ -78,6 +78,7 @@ def format_label(s, latex=True, use_base=False, add_underscore=True):
         s = s.replace('emit', 'ε')
     s = s.replace('kinetic_energy', 'K')
     s = s.replace('energy', 'E')
+    s = s.replace('mean_', '')
     return s
 
 def get_y_label(var):
@@ -134,12 +135,23 @@ def get_screen_data(gpt_data, **params):
     if (len(gpt_data.screen) == 0):
          raise ValueError('No screen data found.')
     
+    use_touts = False
     screen_key = None
     screen_value = None
     
     if ('screen_key' in params and 'screen_value' in params):
         screen_key = params['screen_key']
         screen_value = params['screen_value']
+        
+    if ('tout_z' in params):
+        use_touts = True
+        screen_key = 'z'
+        screen_value = params['tout_z']
+        
+    if ('tout_t' in params):
+        use_touts = True
+        screen_key = 't'
+        screen_value = params['tout_t']
         
     if ('screen_z' in params):
         screen_key = 'z'
@@ -149,12 +161,17 @@ def get_screen_data(gpt_data, **params):
         screen_key = 't'
         screen_value = params['screen_t']
         
+    if (use_touts == False):
+        screen_list = gpt_data.screen
+    else:
+        screen_list = gpt_data.tout
+        
     if (screen_key is not None and screen_value is not None):
 
-        values = np.zeros(len(gpt_data.screen)) * np.nan
+        values = np.zeros(len(screen_list)) * np.nan
         
-        for ii, screen in enumerate(gpt_data.screen, start=0):
-            values[ii] = np.mean(screen[screen_key])
+        for ii, screen in enumerate(screen_list, start=0):
+            values[ii] = screen['mean_'+screen_key]
         
         screen_index = np.argmin(np.abs(values-screen_value))
         found_screen_value = values[screen_index]
@@ -165,7 +182,7 @@ def get_screen_data(gpt_data, **params):
         screen_key = 'index'
         found_screen_value = 0
     
-    screen = gpt_data.screen[screen_index]
+    screen = screen_list[screen_index]
     
     return (screen, screen_key, found_screen_value)
         
