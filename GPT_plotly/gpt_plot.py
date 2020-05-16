@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib as mpl
-import copy
 from gpt.gpt import GPT as GPT
 import plotly.graph_objects as go
 from .tools import *
@@ -36,22 +35,13 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
         for p in gpt_data.particles:
             p.slice_key = params['slice_key']
         
-    vars_needing_copy = ['sigma_t', 'slice']
-        
     # Combine all y data into single array to find good units
     all_y = np.array([])
     all_y_base_units = gpt_data.stat_units(var2[0]).unitSymbol
     for var in var2:
         if (gpt_data.stat_units(var).unitSymbol != all_y_base_units):
             raise ValueError('Plotting data with different units not allowed.')
-        if (any(substr in var for substr in vars_needing_copy)):
-            # special cases. Make a copy of the GPT data and use drift_to_z to get fake screen outputs
-            gpt_data_copy = copy.deepcopy(gpt_data)
-            for tout in gpt_data_copy.tout:
-                tout.drift_to_z()
-            all_y = np.concatenate((all_y, gpt_data_copy.stat(var)))  # touts and screens for unit choices
-        else:
-            all_y = np.concatenate((all_y, gpt_data.stat(var)))  # touts and screens for unit choices
+        all_y = np.concatenate((all_y, gpt_data.stat(var)))  # touts and screens for unit choices
 
     # In the case of emittance, use 2*median(y) as a the default scale, to avoid solenoid growth dominating the choice of scale
     use_median_y_strs = ['norm', 'slice']
@@ -60,13 +50,10 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
         all_y = all_y / y_scale
     else:
         (all_y, y_units, y_scale) = scale_and_get_units(all_y, all_y_base_units)
-    
+                
     # Finally, actually plot the data
     for i, var in enumerate(var2):
-        if (any(substr in var for substr in vars_needing_copy)):
-            y = gpt_data_copy.stat(var, 'tout') / y_scale
-        else:
-            y = gpt_data.stat(var, 'tout') / y_scale
+        y = gpt_data.stat(var, 'tout') / y_scale
         legend_name = f'${format_label(var)}$'
         fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name=legend_name,
                         hovertemplate = '%{x}, %{y}<extra></extra>',
@@ -310,6 +297,11 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
     fig.update_xaxes(title_text=f"${format_label(var1)} \, ({x_units})$")
     fig.update_yaxes(title_text=f"${format_label(var2)} \, ({y_units})$")
              
+    if ('xlim' in params):
+        fig.update_xaxes(range=params['xlim'])
+    if ('ylim' in params):
+        fig.update_yaxes(range=params['ylim'])
+        
     stdx = std_weights(x,q)
     stdy = std_weights(y,q)
     corxy = corr_weights(x,y,q)
@@ -331,6 +323,7 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
         y_units = format_label(y_units, latex=False)
         avgx_units = format_label(avgx_units, latex=False)
         avgy_units = format_label(avgy_units, latex=False)
+        q_units = format_label(q_units, latex=False)
         if (show_emit):
             emitxy_units = format_label(emitxy_units, latex=False)
         var1_label = format_label(var1, add_underscore=False, latex=False)
@@ -338,6 +331,7 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
         data = dict(col1=[], col2=[], col3=[])
         if (screen_key is not None):
             data = add_row(data, col1=f'Screen {screen_key}', col2=f'{screen_value:G}', col3='')
+        data = add_row(data, col1=f'Total charge', col2=f'{q_total:G}', col3=f'{q_units}')
         data = add_row(data, col1=f'Mean {var1_label}', col2=f'{avgx:G}', col3=f'{avgx_units}')
         data = add_row(data, col1=f'Mean {var2_label}', col2=f'{avgy:G}', col3=f'{avgy_units}')
         data = add_row(data, col1=f'σ_{var1_label}', col2=f'{stdx:G}', col3=f'{x_units}')

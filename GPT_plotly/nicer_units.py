@@ -14,7 +14,7 @@ def nicer_scale_prefix(scale, mm_cutoff=0.1):
     """
     
     max_val = np.max(np.abs(scale))
-    
+        
     if max_val < 1e-28:
         return 1, ''
         
@@ -38,17 +38,16 @@ def nicer_array(a, mm_cutoff=0.1):
         (array([200., 300.]), 1e-12, 'p')
     
     """
-    
+        
     if np.isscalar(a):
         x = a
     elif len(a) == 1:
         x = a[0]
     else:
-        a = np.array(a)
-        x = a.ptp()
-     
+        x = np.array(a)
+         
     fac, prefix = nicer_scale_prefix( x, mm_cutoff=mm_cutoff )
-    
+        
     return a/fac, fac,  prefix
 
 

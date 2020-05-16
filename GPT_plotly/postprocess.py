@@ -5,11 +5,20 @@ import numpy.polynomial.polynomial as poly
 
 def postprocess_screen(screen, **params):
     
-    need_copy_params = ['take_slice', 'cylindrical_copies', 'remove_correlation']
+    need_copy_params = ['take_slice', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 'radial_aperture']
     need_copy = any([p in params for p in need_copy_params])
+    
     if (need_copy):
         screen = copy.deepcopy(screen)
-        
+    
+    if ('radial_aperture' in params):
+        cutoff_radius = params['radial_aperture']
+        screen = radial_aperture(screen, cutoff_radius)
+    
+    if ('kill_zero_weight' in params):
+        if (params['kill_zero_weight']):
+            screen = kill_zero_weight(screen)
+    
     if ('take_slice' in params):
         (take_slice_var, slice_index, n_slices) = params['take_slice']
         if (n_slices > 1):
@@ -27,6 +36,31 @@ def postprocess_screen(screen, **params):
         
     return screen
 
+
+def kill_zero_weight(screen):
+    weight = screen.weight
+    
+    screen.x = screen.x[weight>0]
+    screen.y = screen.y[weight>0]
+    screen.z = screen.z[weight>0]
+    screen.px = screen.px[weight>0]
+    screen.py = screen.py[weight>0]
+    screen.pz = screen.pz[weight>0]
+    screen.t = screen.t[weight>0]
+    screen.status = screen.status[weight>0]
+
+    if (hasattr(screen, 'id')):
+        screen.id = screen.id[weight>0]
+        
+    screen.weight = screen.weight[weight>0] # do last
+    
+    return screen
+
+
+def radial_aperture(screen, cutoff_radius):
+    r = screen.r
+    screen.weight[r>cutoff_radius] = 0
+    return screen
 
 def take_slice(screen, take_slice_var, slice_index, n_slices):
     p_list, edges, density_norm = divide_particles(screen, nbins=n_slices, key=take_slice_var)
@@ -70,7 +104,6 @@ def add_cylindrical_copies(screen, n_copies):
     costh = np.cos(theta);
     sinth = np.sin(theta);
     
-
     px_new = px*costh - py*sinth
     py_new = px*sinth + py*costh
     px = px_new

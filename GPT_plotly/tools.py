@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib as mpl
 import plotly.graph_objects as go
 from .nicer_units import *
+from .ParticleGroupExtension import ParticleGroupExtension
 
 def get_dist_plot_type(dist_y):
     dist_y = dist_y.lower()
@@ -182,7 +183,7 @@ def get_screen_data(gpt_data, **params):
         screen_key = 'index'
         found_screen_value = 0
     
-    screen = screen_list[screen_index]
+    screen = ParticleGroupExtension(input_particle_group=screen_list[screen_index])
     
     return (screen, screen_key, found_screen_value)
         
@@ -349,22 +350,42 @@ def scatter_hist2d(fig, x, y, bins=10, range=None, density=False, weights=None,
 def scatter_color(fig, pmd, x, y, color_var='density', bins=10, weights=None, colormap = None, is_radial_var=[False, False], **kwargs):
     
     force_zero = False
-       
+    use_separate_data = False
+        
+    if (isinstance(color_var, tuple)):
+        color_var_data = color_var[1]
+        color_var = color_var[0]
+        use_separate_data = True
+        x_c = color_var_data.x
+        y_c = color_var_data.y
+    else:
+        color_var_data = pmd
+        x_c = x
+        y_c = y
+        
     if (color_var=='density'):
-        x2 = x
-        y2 = y
+        x2 = x_c
+        y2 = y_c
         if (is_radial_var[0]):
-            x2 = x*x
+            x2 = x_c*x_c
         if (is_radial_var[1]):
-            y2 = y*y
+            y2 = y_c*y_c
         h, xe, ye = np.histogram2d(x2, y2, bins=bins, weights=weights)
         c = map_hist(x2, y2, h, bins=(xe, ye))
         force_zero = True
         title_str = 'Density'
     else:
-        q = pmd.weight
-        (c, c_units, c_scale, avgc, avgc_units, avgc_scale) = scale_mean_and_get_units(getattr(pmd, color_var), pmd.units(color_var).unitSymbol, subtract_mean=True, weights=q)
-        title_str = f'{color_var} ({c_units})'
+        q = color_var_data.weight
+        (c, c_units, c_scale, avgc, avgc_units, avgc_scale) = scale_mean_and_get_units(getattr(color_var_data, color_var), color_var_data.units(color_var).unitSymbol, 
+                                                                                       subtract_mean=True, weights=q)
+        
+        title_str = f'{color_var} ({format_label(c_units, latex=False)})'
+    
+    if (use_separate_data):
+        # Reorder to order from pmd
+        c_id = color_var_data.id
+        c_dict = {id : i for i,id in enumerate(c_id)}
+        c = [c[c_dict[id]] if id in c_dict else np.nan for id in pmd.id]
     
     if (colormap is None):
         colormap = mpl.cm.get_cmap('jet') 

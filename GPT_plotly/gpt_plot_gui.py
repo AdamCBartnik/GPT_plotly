@@ -44,13 +44,18 @@ def gpt_plot_gui(gpt_data_input):
     nbin_1d_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
     
     dist2d_type_dropdown = widgets.Dropdown(options=[('Scatter', 'scatter'), ('Histogram', 'histogram')], value='histogram', layout=layout_150px)
-    scatter_color = ['density','t','x','y','r','px','py','pz','pr']
+    scatter_color = ['density','t','x','y','r','px','py','pz','pr','action_x','action_y']
     scatter_color_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(scatter_color)], value=0, layout=layout_150px)
     dist_x_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_list)], value=1, layout=layout_150px)
     dist_y_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_list)], value=2, layout=layout_150px)
     axis_equal_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
     nbin_x_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
     nbin_y_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
+    
+    remove_zero_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
+    
+    radial_aperture_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
+    radial_aperture_r_text = widgets.BoundedFloatText(value=1, min=0, layout=layout_150px)
     
     cyl_copies_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
     cyl_copies_text = widgets.BoundedIntText(value=50, min=10, max=500, step=1, layout=layout_150px)
@@ -90,6 +95,10 @@ def gpt_plot_gui(gpt_data_input):
         scatter_color_var = scatter_color_dropdown.label.lower()
         axis_equal = axis_equal_checkbox.value
         nbins = [nbin_x_text.value, nbin_y_text.value]
+        
+        remove_zero_weight = remove_zero_checkbox.value and (plottype!='trends')
+        radial_aperture_on = radial_aperture_checkbox.value and (plottype!='trends')
+        radial_aperture_r = radial_aperture_r_text.value * 1.0e-3 # (mm)
         
         cyl_copies = cyl_copies_text.value
         cyl_copies_on = cyl_copies_checkbox.value and (plottype!='trends')
@@ -139,6 +148,10 @@ def gpt_plot_gui(gpt_data_input):
                 params['screen_z'] = screen_z_list[screen_zt_dropdown.value]
             if (screen_type_dropdown.label.lower() == 'tout'):
                 params['tout_z'] = tout_z_list[screen_zt_dropdown.value]
+            if (remove_zero_weight):
+                params['kill_zero_weight'] = remove_zero_weight
+            if (radial_aperture_on):
+                params['radial_aperture'] = radial_aperture_r
             if (cyl_copies_on):
                 params['cylindrical_copies'] = cyl_copies
             if (remove_correlation):
@@ -207,6 +220,9 @@ def gpt_plot_gui(gpt_data_input):
     ])
     
     postprocess_tab = widgets.VBox([
+        widgets.HBox([widgets.Label('Remove zero weight', layout=label_layout), remove_zero_checkbox]),
+        widgets.HBox([widgets.Label('Radial aperture', layout=label_layout), radial_aperture_checkbox]),
+        widgets.HBox([widgets.Label('Radius (mm)', layout=label_layout), radial_aperture_r_text]),
         widgets.HBox([widgets.Label('Cylindrical copies', layout=label_layout), cyl_copies_checkbox]),
         widgets.HBox([widgets.Label('Number of copies', layout=label_layout), cyl_copies_text]),
         widgets.HBox([widgets.Label('Remove Correlation', layout=label_layout), remove_correlation_checkbox]),
@@ -268,6 +284,9 @@ def gpt_plot_gui(gpt_data_input):
     take_slice_nslices_text.observe(remake_on_value_change, names='value')
     trend_slice_var_dropdown.observe(remake_on_value_change, names='value')
     trend_slice_nslices_text.observe(remake_on_value_change, names='value')
+    remove_zero_checkbox.observe(remake_on_value_change, names='value')
+    radial_aperture_checkbox.observe(remake_on_value_change, names='value')
+    radial_aperture_r_text.observe(remake_on_value_change, names='value')
         
     return gui
 
