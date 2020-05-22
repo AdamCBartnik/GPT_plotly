@@ -3,6 +3,7 @@ import matplotlib as mpl
 import plotly.graph_objects as go
 from .nicer_units import *
 from .ParticleGroupExtension import ParticleGroupExtension
+from scipy.stats import binned_statistic_2d
 
 def get_dist_plot_type(dist_y):
     dist_y = dist_y.lower()
@@ -273,81 +274,83 @@ def pad_data_with_zeros(edges_plt, hist_plt, sides=[True,True]):
         hist_plt = np.concatenate((hist_plt, np.array([0,0])))
     return (edges_plt, hist_plt)
 
+    
 
 
-def hist2d(fig,x,y,weights=None,bins=[100,100],colormap=None, density=False, is_radial_var=[False,False], colorbar_x=None):
+def hist2d(fig, pmd, x, y, weights, color_var='density', bins=[100,100], colormap=mpl.cm.get_cmap('jet'), is_radial_var=[False,False]):
+    force_zero = False
+    use_separate_data = False
+        
+    if (isinstance(color_var, tuple)):
+        color_var_data = color_var[1]
+        color_var = color_var[0]
+        use_separate_data = True
+        x_c = color_var_data.x
+        y_c = color_var_data.y
+    else:
+        color_var_data = pmd
+        x_c = x
+        y_c = y
+    
     if (is_radial_var[0]):
         x = x*x
     if (is_radial_var[1]):
         y = y*y
-    H, xedges, yedges = np.histogram2d(x, y, bins=bins, weights=weights, density=density)
+                
+    if (color_var == 'density'):
+        # Here I use mean*count instead of sum, in order to have empty bins = NaN
+        H_mean, xedges, yedges, _ = binned_statistic_2d(x, y, weights, statistic='mean', bins=bins)
+        H_count, xedges, yedges, _ = binned_statistic_2d(x, y, weights, statistic='count', bins=bins)
+        H = H_mean*H_count / (xedges[1]-xedges[0]) / (yedges[1]-yedges[0])
+        title_str = 'Density'
+    else:
+        q = color_var_data.weight
+        
+        no_subtract_mean = ['r', 'pr']
+        (c, c_units, c_scale, avgc, avgc_units, avgc_scale) = scale_mean_and_get_units(getattr(color_var_data, color_var), color_var_data.units(color_var).unitSymbol, 
+                                                                                       subtract_mean=(color_var not in no_subtract_mean), weights=q)
+        
+        title_str = f'{color_var} ({format_label(c_units, latex=False)})'
+
+        if (use_separate_data):
+            # Reorder to order from pmd
+            c_id = color_var_data.id
+            c_dict = {id : i for i,id in enumerate(c_id)}
+            c = [c[c_dict[id]] if id in c_dict else np.nan for id in pmd.id]
+
+        H, xedges, yedges, _ = binned_statistic_2d(x, y, c, statistic='mean', bins=bins)
+    
     if (is_radial_var[0]):
         xedges = np.sqrt(xedges)
     if (is_radial_var[1]):
         yedges = np.sqrt(yedges)
     H = H.T
-    
-    colorscale = 'Viridis'
-    if (colormap is not None):
-        colorscale = [[i/(colormap.N-1), "#%02x%02x%02x" % (int(c[0]), int(c[1]), int(c[2]))] for i, c in enumerate(255*colormap(range(colormap.N)))]
-    
+        
+    colorscale = [[i/(colormap.N-1), "#%02x%02x%02x" % (int(cc[0]), int(cc[1]), int(cc[2]))] for i, cc in enumerate(255*colormap(range(colormap.N)))]
+        
+    force_zero_vars = ['r', 'pr','density']
+    force_zero = color_var in force_zero_vars
+        
+    zmin = np.nanmin(H)
+    zmax = np.nanmax(H)
+    if (force_zero):
+        zmin = 0.0
+        
     trace = go.Heatmap(
         hoverinfo="none",  #hovertemplate = '%{x}, %{y}, %{z}<extra></extra>',
         x = xedges,
         y = yedges,
         z = H,
         type = 'heatmap',
-        colorscale = colorscale)     
+        zmin = zmin,
+        zmax = zmax,
+        colorscale = colorscale,
+        colorbar=dict(title=title_str))     
         
     return trace
 
-
-def scatter_hist2d(fig, x, y, bins=10, range=None, density=False, weights=None,
-                   colormap = mpl.cm.get_cmap('jet'), dens_func=None, is_radial_var=[False, False], **kwargs):
-    if (is_radial_var[0]):
-        x = x*x
-    if (is_radial_var[1]):
-        y = y*y
-    h, xe, ye = np.histogram2d(x, y, bins=bins, range=range, density=density, weights=weights)
-    dens = map_hist(x, y, h, bins=(xe, ye))
-    if (is_radial_var[0]):
-        x = np.sqrt(x)
-        xe = np.sqrt(xe)
-    if (is_radial_var[1]):
-        y = np.sqrt(y)
-        ye = np.sqrt(ye)
-    if dens_func is not None:
-        dens = dens_func(dens)
-    iorder = slice(None)  # No ordering by default
-    iorder = np.argsort(dens)
-    x = x[iorder]
-    y = y[iorder]
-    dens = dens[iorder]
-
-    if (colormap is None):
-        colormap = mpl.cm.get_cmap('jet') 
-        
-    #colorscale = [[i/(colormap.N-1), "#%02x%02x%02x" % (int(c[0]), int(c[1]), int(c[2]))] for i, c in enumerate(255*colormap(range(colormap.N)))]    
-    colors = ["#%02x%02x%02x" % (int(r), int(g), int(b)) for r, g, b, _ in 255*colormap(mpl.colors.Normalize(vmin=0.0)(dens))]
     
-    scatter = go.Scattergl(x=x, y=y, mode='markers',
-                     hoverinfo="none",
-                     marker=dict(
-                         size=4,
-                         color=colors,
-                         line_width=0
-                         )
-                     )
-
-    #palette = [RGB(*tuple(rgb)).to_hex() for rgb in (255*colormap(np.arange(256))).astype('int')]
-    #color_mapper = LinearColorMapper(palette=palette, low=0.0, high=np.max(dens))
-    #color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12, border_line_color=None, location=(0,0))   
-    #p.add_layout(color_bar, 'right')
-    
-    return scatter
-    
-    
-def scatter_color(fig, pmd, x, y, color_var='density', bins=10, weights=None, colormap = None, is_radial_var=[False, False], **kwargs):
+def scatter_color(fig, pmd, x, y, weights=None, color_var='density', bins=100, colormap=mpl.cm.get_cmap('jet'), is_radial_var=[False, False], **kwargs):
     
     force_zero = False
     use_separate_data = False
@@ -376,8 +379,10 @@ def scatter_color(fig, pmd, x, y, color_var='density', bins=10, weights=None, co
         title_str = 'Density'
     else:
         q = color_var_data.weight
+        
+        no_subtract_mean = ['r', 'pr']
         (c, c_units, c_scale, avgc, avgc_units, avgc_scale) = scale_mean_and_get_units(getattr(color_var_data, color_var), color_var_data.units(color_var).unitSymbol, 
-                                                                                       subtract_mean=True, weights=q)
+                                                                                       subtract_mean=(color_var not in no_subtract_mean), weights=q)
         
         title_str = f'{color_var} ({format_label(c_units, latex=False)})'
     
@@ -387,12 +392,10 @@ def scatter_color(fig, pmd, x, y, color_var='density', bins=10, weights=None, co
         c_dict = {id : i for i,id in enumerate(c_id)}
         c = [c[c_dict[id]] if id in c_dict else np.nan for id in pmd.id]
     
-    if (colormap is None):
-        colormap = mpl.cm.get_cmap('jet') 
     colorscale = [[i/(colormap.N-1), "#%02x%02x%02x" % (int(c[0]), int(c[1]), int(c[2]))] for i, c in enumerate(255*colormap(range(colormap.N)))]
-   
-    cmin = np.min(c)
-    cmax = np.max(c)
+    
+    cmin = np.nanmin(c)
+    cmax = np.nanmax(c)
     if (force_zero):
         cmin = 0.0
 
@@ -409,15 +412,9 @@ def scatter_color(fig, pmd, x, y, color_var='density', bins=10, weights=None, co
                          )
                      )
 
-    #palette = [RGB(*tuple(rgb)).to_hex() for rgb in (255*colormap(np.arange(256))).astype('int')]
-    #color_mapper = LinearColorMapper(palette=palette, low=0.0, high=np.max(dens))
-    #color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12, border_line_color=None, location=(0,0))   
-    #p.add_layout(color_bar, 'right')
     
     return scatter
-    
-#    color='#e41a1c'
-    
+        
     
 def map_hist(x, y, h, bins):
     xi = np.digitize(x, bins[0]) - 1
@@ -432,21 +429,6 @@ def map_hist(x, y, h, bins):
     return vals
 
 
-def radial_histogram_no_units(r, weights=None, nbins=1000):
-
-    """ Performs histogramming of the varibale r using non-equally space bins """
-    r2 = r*r
-    dr2 = (max(r2)-min(r2))/(nbins-2);
-    r2_edges = np.linspace(min(r2), max(r2) + dr2, nbins);
-    dr2 = r2_edges[1]-r2_edges[0]
-    edges = np.sqrt(r2_edges)
-    
-    which_bins = np.digitize(r2, r2_edges)-1
-    minlength = r2_edges.size-1
-    hist = np.bincount(which_bins, weights=weights, minlength=minlength)/(np.pi*dr2)
-
-    return (hist, edges)
-    
     
 
 def make_parameter_table(fig, data, headers):

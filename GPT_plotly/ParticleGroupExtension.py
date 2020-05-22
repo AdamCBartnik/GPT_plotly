@@ -17,6 +17,9 @@ class ParticleGroupExtension(ParticleGroup):
             for key in input_particle_group._settable_keys:
                 data[key] = copy.copy(input_particle_group[key])  # is deepcopy needed?
         
+            if ('id' not in input_particle_group._settable_keys and hasattr(input_particle_group, 'id')):
+                data['id'] = copy.copy(input_particle_group['id'])
+        
         super().__init__(data=data)
         
         if ('sqrt_norm_emit_4d' not in PARTICLEGROUP_UNITS.keys()):

@@ -22,7 +22,8 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
     cmap = ["#%02x%02x%02x" % (int(r), int(g), int(b)) for r, g, b, _ in 255*mpl_cmap(range(mpl_cmap.N))]
     
     # Find good units for x data
-    (x, x_units, x_scale) = scale_and_get_units(gpt_data.stat(var1, 'tout'), gpt_data.stat_units(var1).unitSymbol)
+    (all_x, x_units, x_scale) = scale_and_get_units(gpt_data.stat(var1), gpt_data.stat_units(var1).unitSymbol)  # touts and screens for unit choices
+    x = gpt_data.stat(var1, 'tout') / x_scale
     screen_x = gpt_data.stat(var1, 'screen') / x_scale
     
     if (not isinstance(var2, list)):
@@ -83,7 +84,7 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
         if (isinstance(params['legend'], bool)):
             fig.update_layout(showlegend=params['legend'])
     
-    fig.update_xaxes(range=[np.min(x), np.max(x)])  
+    fig.update_xaxes(range=[np.min(all_x), np.max(all_x)])
     
     # Cases where the y-axis should be forced to start at 0
     # plotly seems to require specifying both sides of the range, so I also set the max range here
@@ -235,13 +236,13 @@ def gpt_plot_dist1d(pmd, var, plot_type='charge', units=None, fig=None, table_fi
     
     
     
-def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None, table_fig=None, table_on=True, **params):
+def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None, table_fig=None, table_on=True, plot_width=500, plot_height=400, **params):
 
     if (table_on):
-        fig = make_default_plot(fig, plot_width=500, plot_height=400, **params)
-        table_fig = make_default_plot(table_fig, plot_width=400, plot_height=400, is_table=True, **params)
+        fig = make_default_plot(fig, plot_width=plot_width, plot_height=plot_height, **params)
+        table_fig = make_default_plot(table_fig, plot_width=400, plot_height=plot_height, is_table=True, **params)
     else:
-        fig = make_default_plot(fig, plot_width=500, plot_height=400, **params)
+        fig = make_default_plot(fig, plot_width=plot_width, plot_height=plot_height, **params)
     
     screen_key = None
     screen_value = None
@@ -251,6 +252,16 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
         pmd = ParticleGroupExtension(input_particle_group=pmd)
     pmd = postprocess_screen(pmd, **params)
             
+    if (isinstance(var2, tuple)):
+        use_separate_data = True
+        pmd2 = var2[1]
+        var2 = var2[0]
+        if (not isinstance(pmd2, ParticleGroupExtension)):
+            pmd2 = ParticleGroupExtension(input_particle_group=pmd2)
+    else:
+        use_separate_data = False
+        pmd2 = pmd
+        
     if('axis' in params and params['axis']=='equal'):
         fig.update_layout(
             yaxis = dict(
@@ -282,17 +293,27 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
     q_total, charge_scale, charge_prefix = nicer_array(pmd.charge)
     q = pmd.weight / charge_scale
     q_units = check_mu(charge_prefix)+charge_base_units
-    
+       
     (x, x_units, x_scale, avgx, avgx_units, avgx_scale) = scale_mean_and_get_units(getattr(pmd, var1), pmd.units(var1).unitSymbol, subtract_mean= not is_radial_var[0], weights=q)
-    (y, y_units, y_scale, avgy, avgy_units, avgy_scale) = scale_mean_and_get_units(getattr(pmd, var2), pmd.units(var2).unitSymbol, subtract_mean= not is_radial_var[1], weights=q)
-                
+    
+    y = getattr(pmd2, var2)
+    q_y = pmd2.weight / charge_scale
+    if (use_separate_data):
+        # Reorder to order from pmd
+        y_id = pmd2.id
+        y_dict = {id : i for i,id in enumerate(y_id)}
+        y = np.array([y[y_dict[id]] if id in y_dict else np.nan for id in pmd.id])
+        q_y = np.array([q_y[y_dict[id]] if id in y_dict else 0.0 for id in pmd.id])
+    
+    (y, y_units, y_scale, avgy, avgy_units, avgy_scale) = scale_mean_and_get_units(y, pmd2.units(var2).unitSymbol, subtract_mean= not is_radial_var[1], weights=q_y)
+    
+    color_var = 'density'
+    if ('color_var' in params):
+        color_var = params['color_var']
     if(plot_type=="scatter"):
-        color_var = 'density'
-        if ('color_var' in params):
-            color_var = params['color_var']
-        fig.add_trace(scatter_color(fig, pmd, x, y, color_var=color_var, bins=nbins, weights=q, colormap=colormap, is_radial_var=is_radial_var))
+        fig.add_trace(scatter_color(fig, pmd, x, y, weights=q, color_var=color_var, bins=nbins, colormap=colormap, is_radial_var=is_radial_var))
     if(plot_type=="histogram"):
-        fig.add_trace(hist2d(fig, x, y, bins=nbins, weights=q, colormap=colormap, is_radial_var=is_radial_var))
+        fig.add_trace(hist2d(fig, pmd, x, y, weights=q, color_var=color_var, bins=nbins, colormap=colormap, is_radial_var=is_radial_var))
                 
     fig.update_xaxes(title_text=f"${format_label(var1)} \, ({x_units})$")
     fig.update_yaxes(title_text=f"${format_label(var2)} \, ({y_units})$")
