@@ -316,8 +316,12 @@ def hist2d(fig, pmd, x, y, weights, color_var='density', bins=[100,100], colorma
             # Reorder to order from pmd
             c_id = color_var_data.id
             c_dict = {id : i for i,id in enumerate(c_id)}
-            c = [c[c_dict[id]] if id in c_dict else np.nan for id in pmd.id]
+            c = np.array([c[c_dict[id]] if id in c_dict else np.nan for id in pmd.id])
 
+        has_color = np.logical_not(np.isnan(c))
+        x = x[has_color]
+        y = y[has_color]
+        c = c[has_color]
         H, xedges, yedges, _ = binned_statistic_2d(x, y, c, statistic='mean', bins=bins)
     
     if (is_radial_var[0]):

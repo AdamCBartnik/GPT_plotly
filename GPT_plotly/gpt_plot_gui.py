@@ -17,12 +17,13 @@ def gpt_plot_gui(gpt_data_input):
     # Layouts
     layout_200px = widgets.Layout(width='200px',height='30px')
     layout_150px = widgets.Layout(width='150px',height='30px')
+    layout_125px = widgets.Layout(width='125px',height='30px')
     layout_100px = widgets.Layout(width='100px',height='30px')
     layout_20px = widgets.Layout(width='20px',height='30px')
     label_layout = layout_150px
     
     # Make widgets
-    dist_list = ['t','x','y','r','px','py','pz','pr']
+    dist_list = ['t','x','y','r','px','py','pz','pr','action_x','action_y']
     
     plottype_list = ['Trends', '1D Distribution', '2D Distribution']
     plottype_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(plottype_list)], value=0)
@@ -44,10 +45,18 @@ def gpt_plot_gui(gpt_data_input):
     nbin_1d_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
     
     dist2d_type_dropdown = widgets.Dropdown(options=[('Scatter', 'scatter'), ('Histogram', 'histogram')], value='histogram', layout=layout_150px)
-    scatter_color = ['density','t','x','y','r','px','py','pz','pr','action_x','action_y']
-    scatter_color_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(scatter_color)], value=0, layout=layout_150px)
+    scatter_color = ['density'] + dist_list
+    dist2d_color_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(scatter_color)], value=0, layout=layout_150px)
+    dist2d_color_source_dropdown = widgets.Dropdown(options=[('Same screen', 'same'), ('Alternate screen', 'alt')], value='same', layout=layout_150px)
+    dist2d_color_screen_type_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(screen_type_list)], value=0, layout=layout_150px)
+    dist2d_color_screen_zt_dropdown = widgets.Dropdown(options=[(f'{z:.3f}', i) for (i,z) in enumerate(screen_z_list)], layout=layout_100px)
+    
     dist_x_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_list)], value=1, layout=layout_150px)
     dist_y_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_list)], value=2, layout=layout_150px)
+    dist_y_source_dropdown = widgets.Dropdown(options=[('Same screen', 'same'), ('Alternate screen', 'alt')], value='same', layout=layout_150px)
+    dist_y_screen_type_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(screen_type_list)], value=0, layout=layout_150px)
+    dist_y_screen_zt_dropdown = widgets.Dropdown(options=[(f'{z:.3f}', i) for (i,z) in enumerate(screen_z_list)], layout=layout_100px)
+    
     axis_equal_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
     nbin_x_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
     nbin_y_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
@@ -91,8 +100,10 @@ def gpt_plot_gui(gpt_data_input):
         
         dist_x = dist_x_dropdown.label
         dist_y = dist_y_dropdown.label
+        dist_y_alt_source = dist_y_source_dropdown.value.lower() != 'same'
         ptype = dist2d_type_dropdown.value.lower()
-        scatter_color_var = scatter_color_dropdown.label.lower()
+        dist2d_color_var = dist2d_color_dropdown.label.lower()
+        dist2d_color_alt_source = dist2d_color_source_dropdown.value.lower() != 'same'
         axis_equal = axis_equal_checkbox.value
         nbins = [nbin_x_text.value, nbin_y_text.value]
         
@@ -134,9 +145,14 @@ def gpt_plot_gui(gpt_data_input):
         nbin_1d_text.disabled = not is_dist1d
         
         dist2d_type_dropdown.disabled = not is_dist2d
-        scatter_color_dropdown.disabled = not (is_dist2d and ptype == 'scatter')
+        dist2d_color_dropdown.disabled = not is_dist2d
+        dist2d_color_screen_type_dropdown.disabled = not dist2d_color_alt_source
+        dist2d_color_screen_zt_dropdown.disabled = not dist2d_color_alt_source
         dist_x_dropdown.disabled = not is_dist2d
         dist_y_dropdown.disabled = not is_dist2d
+        dist_y_dropdown.disabled = not is_dist2d
+        dist_y_screen_type_dropdown.disabled = not dist_y_alt_source
+        dist_y_screen_zt_dropdown.disabled = not dist_y_alt_source
         axis_equal_checkbox.disabled = not is_dist2d
         nbin_x_text.disabled = not is_dist2d
         nbin_y_text.disabled = not is_dist2d
@@ -178,7 +194,18 @@ def gpt_plot_gui(gpt_data_input):
         if (is_dist2d):
             if (tab_panel.selected_index < 3):
                 tab_panel.selected_index = 2
-            params['color_var'] = scatter_color_var
+            if (dist_y_alt_source):
+                if (dist_y_screen_type_dropdown.label.lower() == 'screen'):
+                    dist_y = (dist_y, get_screen_data(gpt_data, screen_z=screen_z_list[dist_y_screen_zt_dropdown.value])[0])
+                if (dist_y_screen_type_dropdown.label.lower() == 'tout'):
+                    dist_y = (dist_y, get_screen_data(gpt_data, tout_z=tout_z_list[dist_y_screen_zt_dropdown.value])[0])
+            if (dist2d_color_alt_source):
+                if (dist2d_color_screen_type_dropdown.label.lower() == 'screen'):
+                    params['color_var'] = (dist2d_color_var, get_screen_data(gpt_data, screen_z=screen_z_list[dist2d_color_screen_zt_dropdown.value])[0])
+                if (dist2d_color_screen_type_dropdown.label.lower() == 'tout'):
+                    params['color_var'] = (dist2d_color_var, get_screen_data(gpt_data, tout_z=tout_z_list[dist2d_color_screen_zt_dropdown.value])[0])
+            else:
+                params['color_var'] = dist2d_color_var
             if (axis_equal):
                 params['axis'] = 'equal'
             gui.children += (gpt_plot_dist2d(gpt_data, dist_x, dist_y, plot_type=ptype, nbins=nbins, **params), )
@@ -193,6 +220,20 @@ def gpt_plot_gui(gpt_data_input):
             screen_zt_dropdown.options = [(f'{z:.3f}', i) for (i,z) in enumerate(screen_z_list)]
         if (screen_type_dropdown.label.lower() == 'tout'):
             screen_zt_dropdown.options = [(f'{z:.3f}', i) for (i,z) in enumerate(tout_z_list)]
+        make_plot()
+        
+    def dist2d_color_fill_screen_list(change):
+        if (dist2d_color_screen_type_dropdown.label.lower() == 'screen'):
+            dist2d_color_screen_zt_dropdown.options = [(f'{z:.3f}', i) for (i,z) in enumerate(screen_z_list)]
+        if (dist2d_color_screen_type_dropdown.label.lower() == 'tout'):
+            dist2d_color_screen_zt_dropdown.options = [(f'{z:.3f}', i) for (i,z) in enumerate(tout_z_list)]
+        make_plot()
+        
+    def dist_y_fill_screen_list(change):
+        if (dist_y_screen_type_dropdown.label.lower() == 'screen'):
+            dist_y_screen_zt_dropdown.options = [(f'{z:.3f}', i) for (i,z) in enumerate(screen_z_list)]
+        if (dist_y_screen_type_dropdown.label.lower() == 'tout'):
+            dist_y_screen_zt_dropdown.options = [(f'{z:.3f}', i) for (i,z) in enumerate(tout_z_list)]
         make_plot()
         
     # Widget layout within GUI
@@ -211,9 +252,13 @@ def gpt_plot_gui(gpt_data_input):
 
     dist_2d_tab = widgets.VBox([
         widgets.HBox([widgets.Label('Plot method', layout=label_layout), dist2d_type_dropdown]),
-        widgets.HBox([widgets.Label('Scatter color variable', layout=label_layout), scatter_color_dropdown]),
+        widgets.HBox([widgets.Label('Color variable', layout=label_layout), dist2d_color_dropdown]),
+        widgets.HBox([widgets.Label('Color source', layout=label_layout), dist2d_color_source_dropdown]),
+        widgets.HBox([widgets.Label('Color screen type', layout=label_layout), dist2d_color_screen_type_dropdown, dist2d_color_screen_zt_dropdown]),
         widgets.HBox([widgets.Label('X axis', layout=label_layout), dist_x_dropdown]), 
         widgets.HBox([widgets.Label('Y axis', layout=label_layout), dist_y_dropdown]),
+        widgets.HBox([widgets.Label('Y source', layout=label_layout), dist_y_source_dropdown]),
+        widgets.HBox([widgets.Label('Y screen type', layout=label_layout), dist_y_screen_type_dropdown, dist_y_screen_zt_dropdown]),
         widgets.HBox([widgets.Label('Equal scale axes', layout=label_layout), axis_equal_checkbox]),
         widgets.HBox([widgets.Label('Histogram bins, X', layout=label_layout), nbin_x_text]),
         widgets.HBox([widgets.Label('Histogram bins, Y', layout=label_layout), nbin_y_text])
@@ -263,6 +308,9 @@ def gpt_plot_gui(gpt_data_input):
     dist_x_1d_dropdown.observe(remake_on_value_change, names='value')
     dist_x_dropdown.observe(remake_on_value_change, names='value')
     dist_y_dropdown.observe(remake_on_value_change, names='value')
+    dist_y_source_dropdown.observe(remake_on_value_change, names='value')
+    dist_y_screen_type_dropdown.observe(dist_y_fill_screen_list, names='value')
+    dist_y_screen_zt_dropdown.observe(remake_on_value_change, names='value')
     screen_zt_dropdown.observe(remake_on_value_change, names='value')
     screen_type_dropdown.observe(fill_screen_list, names='value')
     nbin_1d_text.observe(remake_on_value_change, names='value')
@@ -271,7 +319,10 @@ def gpt_plot_gui(gpt_data_input):
     cyl_copies_checkbox.observe(remake_on_value_change, names='value')
     cyl_copies_text.observe(remake_on_value_change, names='value')
     dist2d_type_dropdown.observe(remake_on_value_change, names='value')
-    scatter_color_dropdown.observe(remake_on_value_change, names='value')
+    dist2d_color_dropdown.observe(remake_on_value_change, names='value')
+    dist2d_color_source_dropdown.observe(remake_on_value_change, names='value')
+    dist2d_color_screen_type_dropdown.observe(dist2d_color_fill_screen_list, names='value')
+    dist2d_color_screen_zt_dropdown.observe(remake_on_value_change, names='value')
     axis_equal_checkbox.observe(remake_on_value_change, names='value')
     dist_type_1d_dropdown.observe(remake_on_value_change, names='value')
     remove_correlation_checkbox.observe(remake_on_value_change, names='value')
