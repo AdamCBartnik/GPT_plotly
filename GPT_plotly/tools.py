@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import matplotlib as mpl
 import plotly.graph_objects as go
@@ -133,10 +134,7 @@ def duplicate_points_for_hist_plot(edges, hist):
     return (edges_plt, hist_plt)
 
 
-def get_screen_data(gpt_data, **params):
-    if (len(gpt_data.screen) == 0):
-         raise ValueError('No screen data found.')
-    
+def get_screen_data(gpt_data, verbose=False, use_extension=True, **params):   
     use_touts = False
     screen_key = None
     screen_value = None
@@ -165,8 +163,12 @@ def get_screen_data(gpt_data, **params):
         
     if (use_touts == False):
         screen_list = gpt_data.screen
+        if (len(gpt_data.screen) == 0):
+             raise ValueError('No screen data found.')
     else:
         screen_list = gpt_data.tout
+        if (len(gpt_data.tout) == 0):
+             raise ValueError('No tout data found.')
         
     if (screen_key is not None and screen_value is not None):
 
@@ -177,14 +179,19 @@ def get_screen_data(gpt_data, **params):
         
         screen_index = np.argmin(np.abs(values-screen_value))
         found_screen_value = values[screen_index]
-        #print(f'Found screen at {screen_key} = {values[screen_index]}')
+        if (verbose):
+            print(f'Found screen at {screen_key} = {values[screen_index]}')
     else:
-        print('Defaulting to screen[0]')
+        if (verbose):
+            print('Defaulting to screen[0]')
         screen_index = 0
         screen_key = 'index'
         found_screen_value = 0
     
-    screen = ParticleGroupExtension(input_particle_group=screen_list[screen_index])
+    if (use_extension):
+        screen = ParticleGroupExtension(input_particle_group=screen_list[screen_index])
+    else:
+        screen = copy.deepcopy(screen_list[screen_index])
     
     return (screen, screen_key, found_screen_value)
         
