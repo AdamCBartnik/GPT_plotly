@@ -4,7 +4,9 @@ from distgen import Generator
 from distgen.tools import update_nested_dict
 
 
-def get_cathode_particlegroup(settings, DISTGEN_INPUT_FILE, verbose=False, distgen_verbose=False, id_start=1):
+def get_cathode_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=False, distgen_verbose=False, id_start=1):
+    settings = copy.copy(settings_input)
+    
     distgen_input = yaml.safe_load(open(DISTGEN_INPUT_FILE))
     for k, v in settings.items():
         distgen_input = update_nested_dict(distgen_input, {k:v}, verbose=verbose, create_new=False)
@@ -33,7 +35,8 @@ def get_cathode_particlegroup(settings, DISTGEN_INPUT_FILE, verbose=False, distg
 
     
 
-def get_coreshield_particlegroup(settings, DISTGEN_INPUT_FILE, verbose=False, distgen_verbose=False):
+def get_coreshield_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=False, distgen_verbose=False):
+    settings = copy.copy(settings_input)
     
     if ('coreshield:n_core' in settings):
         n_core = settings['coreshield:n_core']
