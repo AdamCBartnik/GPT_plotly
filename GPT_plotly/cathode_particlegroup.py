@@ -25,7 +25,7 @@ def get_cathode_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=False,
                 settings_1[var] = settings[var] * sig_ratio
         PG = get_cathode_particlegroup(settings_1, DISTGEN_INPUT_FILE, verbose=verbose, distgen_verbose=distgen_verbose, id_start=id_start)
         if (verbose):
-            print(f'Rescaling sigma_xy from {sx} -> {settings["cathode:sigma_xy"]}. Acheived: {PG["sigma_x"]}')
+            print(f'Rescaling sigma_xy from {sx} -> {settings["cathode:sigma_xy"]}. Achieved: {PG["sigma_x"]}')
         return PG
     
     PG.assign_id()
@@ -46,7 +46,11 @@ def get_coreshield_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=Fal
         
     core_charge_fraction = 0.5
     if ('coreshield:core_charge_fraction' in settings):
-        core_charge_fraction = settings['coreshield:core_charge_fraction']       
+        core_charge_fraction = settings['coreshield:core_charge_fraction']
+        if (core_charge_fraction < 0.0 or core_charge_fraction > 1.0):
+            core_charge_fraction = 0.5
+            if (verbose):
+                print('Invalid core charge fraction, defaulting to 0.5')
     
     sigma_xy = None
     if ('cathode:sigma_xy' in settings):
@@ -95,7 +99,7 @@ def get_coreshield_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=Fal
         
     if (verbose):
         if (sigma_xy is not None):
-            print(f'Rescaling sigma_xy from {sx} -> {sigma_xy}. Acheived: {PG["sigma_x"]}')
+            print(f'Rescaling sigma_xy from {sx} -> {sigma_xy}. Achieved: {PG["sigma_x"]}')
         
     return PG
 

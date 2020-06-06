@@ -91,6 +91,13 @@ def multirun_gpt_with_particlegroup(settings=None,
     # If here, either phasing successful, or no phasing requested
     G.run(gpt_verbose=gpt_verbose)
                 
+    # Remove touts and screens that are after t_restart
+    G.output['n_tout'] = np.count_nonzero(G.stat('mean_t', 'tout') <= t_restart)
+    G.output['n_screen'] = np.count_nonzero(G.stat('mean_t', 'screen') <= t_restart)
+    for p in reversed(G.particles):
+        if (p['mean_t'] > t_restart):
+            G.particles.remove(p)
+    
     #G_all = copy.deepcopy(G)
     G_all = G
                 
@@ -118,17 +125,35 @@ def multirun_gpt_with_particlegroup(settings=None,
     if ('final_charge' in settings and len(G_all.screen)>0):
         clip_to_charge(G_all.screen[-1], settings['final_charge'])
         
+    if (input_particle_group['sigma_t'] == 0.0):
+        # Initial distribution is a tout
+        G_all.output['particles'].insert(0, input_particle_group)
+        G_all.output['n_tout'] = G_all.output['n_tout']+1
+    else:
+        # Initial distribution is a screen
+        G_all.output['particles'].insert(G_all.output['n_tout'], input_particle_group)
+        G_all.output['n_screen'] = G_all.output['n_screen']+1
+        
     return G_all
 
 
-def clip_to_charge(PG, clipping_charge):
+def clip_to_charge(PG, clipping_charge, verbose=False):
+    min_final_particles = 3
+    
     r_i = np.argsort(PG.r)
     r = PG.r[r_i]
     w = PG.weight[r_i]
     w_sum = np.cumsum(w)
-    n_clip = np.argmax(w_sum > clipping_charge)
+    if (clipping_charge >= w_sum[-1]):
+        n_clip = -1
+    else:
+        n_clip = np.argmax(w_sum > clipping_charge)
+    if (n_clip < (min_final_particles-1) and n_clip > -1):
+        n_clip = min_final_particles-1
     r_cut = r[n_clip]
     PG.weight[PG.r>r_cut] = 0
+    if (verbose):
+        print(f'Clipping at r = {r_cut}')
     PG = kill_zero_weight(PG)
 
 
