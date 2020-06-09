@@ -69,6 +69,8 @@ def gpt_plot_gui(gpt_data_input):
     cyl_copies_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
     cyl_copies_text = widgets.BoundedIntText(value=50, min=10, max=500, step=1, layout=layout_150px)
     
+    remove_spinning_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
+    
     remove_correlation_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
     remove_correlation_n_text = widgets.BoundedIntText(value=1, min=0, max=10, step=1, layout=layout_150px)
     remove_correlation_var1_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_list)], value=0, layout=layout_150px)
@@ -114,6 +116,8 @@ def gpt_plot_gui(gpt_data_input):
         cyl_copies = cyl_copies_text.value
         cyl_copies_on = cyl_copies_checkbox.value and (plottype!='trends')
         cyl_copies_text.disabled = not cyl_copies_on
+        
+        remove_spinning = remove_spinning_checkbox.value and (plottype!='trends')
         
         remove_correlation = remove_correlation_checkbox.value and (plottype!='trends')
         remove_correlation_n = remove_correlation_n_text.value
@@ -170,6 +174,8 @@ def gpt_plot_gui(gpt_data_input):
                 params['radial_aperture'] = radial_aperture_r
             if (cyl_copies_on):
                 params['cylindrical_copies'] = cyl_copies
+            if (remove_spinning):
+                params['remove_spinning'] = remove_spinning
             if (remove_correlation):
                 params['remove_correlation'] = (remove_correlation_var1, remove_correlation_var2, remove_correlation_n)
             if (take_slice):
@@ -270,6 +276,7 @@ def gpt_plot_gui(gpt_data_input):
         widgets.HBox([widgets.Label('Radius (mm)', layout=label_layout), radial_aperture_r_text]),
         widgets.HBox([widgets.Label('Cylindrical copies', layout=label_layout), cyl_copies_checkbox]),
         widgets.HBox([widgets.Label('Number of copies', layout=label_layout), cyl_copies_text]),
+        widgets.HBox([widgets.Label('Remove Spinning', layout=label_layout), remove_spinning_checkbox]),
         widgets.HBox([widgets.Label('Remove Correlation', layout=label_layout), remove_correlation_checkbox]),
         widgets.HBox([widgets.Label('Max polynomial power', layout=label_layout), remove_correlation_n_text]),
         widgets.HBox([widgets.Label('Independent var (x)', layout=label_layout), remove_correlation_var1_dropdown]), 
@@ -325,6 +332,7 @@ def gpt_plot_gui(gpt_data_input):
     dist2d_color_screen_zt_dropdown.observe(remake_on_value_change, names='value')
     axis_equal_checkbox.observe(remake_on_value_change, names='value')
     dist_type_1d_dropdown.observe(remake_on_value_change, names='value')
+    remove_spinning_checkbox.observe(remake_on_value_change, names='value')
     remove_correlation_checkbox.observe(remake_on_value_change, names='value')
     remove_correlation_n_text.observe(remake_on_value_change, names='value')
     remove_correlation_var1_dropdown.observe(remake_on_value_change, names='value')

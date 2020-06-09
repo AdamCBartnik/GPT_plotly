@@ -8,10 +8,11 @@ import numpy as np
 import copy
 
 class ParticleGroupExtension(ParticleGroup):
-    n_slices = 50
-    slice_key = 't'
     
     def __init__(self, input_particle_group=None, data=None):
+        n_slices = 50
+        slice_key = 't'
+        
         if (input_particle_group):
             data={}
             for key in input_particle_group._settable_keys:
@@ -54,11 +55,11 @@ class ParticleGroupExtension(ParticleGroup):
 
         if ('rp' not in PARTICLEGROUP_UNITS.keys()):
             PARTICLEGROUP_UNITS['rp'] = unit('rad')
-            
+                        
     @property
     def rp(self):
         return self.pr/self.pz 
-            
+        
     @property
     def core_emit_x(self):
         return core_emit_calc(self.x, self.xp, self.weight)

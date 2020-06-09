@@ -5,7 +5,7 @@ import numpy.polynomial.polynomial as poly
 
 def postprocess_screen(screen, **params):
     
-    need_copy_params = ['take_slice', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 'radial_aperture']
+    need_copy_params = ['take_slice', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 'radial_aperture', 'remove_spinning']
     need_copy = any([p in params for p in need_copy_params])
     
     if (need_copy):
@@ -28,6 +28,10 @@ def postprocess_screen(screen, **params):
         cylindrical_copies_n = params['cylindrical_copies']
         if (cylindrical_copies_n > 0):
             screen = add_cylindrical_copies(screen, params['cylindrical_copies'])
+            
+    if ('remove_spinning' in params):
+        if (params['remove_spinning']):
+            screen = remove_spinning(screen)
                
     if ('remove_correlation' in params):
         (remove_correlation_var1, remove_correlation_var2, remove_correlation_n) = params['remove_correlation']
@@ -36,6 +40,41 @@ def postprocess_screen(screen, **params):
         
     return screen
 
+
+
+
+def remove_spinning(screen):
+    x = copy.copy(screen.x)
+    xp = copy.copy(screen.xp)
+    y = copy.copy(screen.y)
+    yp = copy.copy(screen.yp)
+    w = screen.weight
+
+    sumw = np.sum(w)
+
+    x = x - np.sum(x*w)/sumw
+    xp = xp - np.sum(xp*w)/sumw
+    y = y - np.sum(y*w)/sumw
+    yp = yp - np.sum(yp*w)/sumw
+
+    x2 = np.sum(x*x*w)/sumw
+    y2 = np.sum(y*y*w)/sumw
+
+    u2 = (x2+y2)
+
+    xpy = np.sum(x*yp*w)/sumw
+    ypx = np.sum(y*xp*w)/sumw
+
+    L = (xpy-ypx)
+    C = -L/u2
+    
+    xp = xp - C*y
+    yp = yp + C*x
+        
+    screen.px = xp * screen.pz
+    screen.py = yp * screen.pz
+
+    return screen
 
 def kill_zero_weight(screen):
     weight = screen.weight

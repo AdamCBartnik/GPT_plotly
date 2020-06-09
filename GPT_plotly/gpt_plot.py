@@ -332,7 +332,7 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
         corxy_units = f'{x_units}·{y_units}'
     
     show_emit = False
-    if ((var1 == 'x' and var2 == 'px') or (var1 == 'y' and var2 == 'py')):
+    if ((var1 == 'x' and 'px' in var2 ) or (var1 == 'y' and 'py' in var2)):
         show_emit = True
         factor = c_light**2 /e_charge # kg -> eV
         particle_mass = 9.10938356e-31  # kg
