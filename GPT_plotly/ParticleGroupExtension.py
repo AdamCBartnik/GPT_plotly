@@ -23,39 +23,25 @@ class ParticleGroupExtension(ParticleGroup):
         
         super().__init__(data=data)
         
-        if ('sqrt_norm_emit_4d' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['sqrt_norm_emit_4d'] = unit('m')
-
-        if ('slice_emit_x' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['slice_emit_x'] = unit('m')
-
-        if ('slice_emit_y' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['slice_emit_y'] = unit('m')
-            
-        if ('core_emit_x' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['core_emit_x'] = unit('m')
-
-        if ('core_emit_y' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['core_emit_y'] = unit('m')
+        new_units = {}
+        new_units['sqrt_norm_emit_4d'] = 'm'
+        new_units['slice_emit_x'] = 'm'
+        new_units['slice_emit_y'] = 'm'
+        new_units['core_emit_x'] = 'm'
+        new_units['core_emit_y'] = 'm'
+        new_units['core_emit_4d'] = 'm'
+        new_units['slice_emit_4d'] = 'm'
+        new_units['action_x'] = 'm'
+        new_units['action_y'] = 'm'
+        new_units['rp'] = 'rad'
+        new_units['action_4d'] = 'm'
+        new_units['crazy_action_x'] = 'm'
+        new_units['crazy_action_y'] = 'm'
         
-        if ('core_emit_4d' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['core_emit_4d'] = unit('m')
-
-        if ('slice_emit_4d' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['slice_emit_4d'] = unit('m')
-            
-        if ('action_x' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['action_x'] = unit('m')
-        
-        if ('action_y' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['action_y'] = unit('m')
-            
-        if ('action_r' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['action_r'] = unit('m')
-
-        if ('rp' not in PARTICLEGROUP_UNITS.keys()):
-            PARTICLEGROUP_UNITS['rp'] = unit('rad')
-                        
+        for k in new_units:
+            if (k not in PARTICLEGROUP_UNITS.keys()):
+                PARTICLEGROUP_UNITS[k] = unit(new_units[k])
+                                   
     @property
     def rp(self):
         return self.pr/self.pz 
@@ -94,30 +80,64 @@ class ParticleGroupExtension(ParticleGroup):
     @property
     def action_x(self):
         sig = self.cov('x', 'xp')
-        emit = np.sqrt(np.linalg.det(sig))
+        emit = np.sqrt(np.linalg.det(sig))/(self.gamma*self.beta)
         beta = sig[0,0] / emit
         alpha = -sig[0,1] / emit
         gamma = sig[1,1] / emit
-        return gamma*self.x*self.x + 2.0*alpha*self.x*self.xp + beta*self.xp*self.xp
+        return 0.5*(gamma*self.x*self.x + 2.0*alpha*self.x*self.xp + beta*self.xp*self.xp)
     
     @property
     def action_y(self):
         sig = self.cov('y', 'yp')
-        emit = np.sqrt(np.linalg.det(sig))
+        emit = np.sqrt(np.linalg.det(sig))/(self.gamma*self.beta)
         beta = sig[0,0] / emit
         alpha = -sig[0,1] / emit
         gamma = sig[1,1] / emit
-        return gamma*self.y*self.y + 2.0*alpha*self.y*self.yp + beta*self.yp*self.yp
+        return 0.5*(gamma*self.y*self.y + 2.0*alpha*self.y*self.yp + beta*self.yp*self.yp)
+        
+    @property
+    def crazy_action_x(self):
+        sig = self.cov('x', 'xp', 'y', 'yp')
+        S = np.array([[0, 1, 0, 0],[-1,0,0,0],[0,0,0,1],[0,0,-1,0]])
+        Q = np.array([[1, 1j, 0, 0], [1, -1j, 0, 0], [0, 0, 1, 1j], [0, 0, 1, -1j]]) / np.sqrt(2.0)
+        (w, E) = np.linalg.eig(sig.dot(S))
+        E = E / np.power(np.abs(np.linalg.det(E)), 0.25)
+        E = E[:,[1,0,3,2]] # reorder to make N symplectic
+        N = E.dot(Q)
+        N = N.real 
+        x = np.array([self.x,self.xp, self.y, self.yp])
+        x_new = np.linalg.solve(N, x)
+        return 0.5*(x_new[0,:]**2 + x_new[1,:]**2)*(self.gamma*self.beta)
     
     @property
-    def action_r(self):
-        sig = self.cov('r', 'rp')
-        emit = np.sqrt(np.linalg.det(sig))
-        beta = sig[0,0] / emit
-        alpha = -sig[0,1] / emit
-        gamma = sig[1,1] / emit
-        return gamma*self.r*self.r + 2.0*alpha*self.r*self.rp + beta*self.rp*self.rp
+    def crazy_action_y(self):
+        sig = self.cov('x', 'xp', 'y', 'yp')
+        S = np.array([[0, 1, 0, 0],[-1,0,0,0],[0,0,0,1],[0,0,-1,0]])
+        Q = np.array([[1, 1j, 0, 0], [1, -1j, 0, 0], [0, 0, 1, 1j], [0, 0, 1, -1j]]) / np.sqrt(2.0)
+        (w, E) = np.linalg.eig(sig.dot(S))
+        E = E / np.power(np.abs(np.linalg.det(E)), 0.25)
+        E = E[:,[1,0,3,2]] # reorder to make N symplectic
+        N = E.dot(Q)
+        N = N.real 
+        x = np.array([self.x,self.xp, self.y, self.yp])
+        x_new = np.linalg.solve(N, x)
+        return 0.5*(x_new[2,:]**2 + x_new[3,:]**2)*(self.gamma*self.beta)
     
+    @property
+    def action_4d(self):
+        sig = self.cov('x', 'xp', 'y', 'yp')
+        S = np.array([[0, 1, 0, 0],[-1,0,0,0],[0,0,0,1],[0,0,-1,0]])
+        Q = np.array([[1, 1j, 0, 0], [1, -1j, 0, 0], [0, 0, 1, 1j], [0, 0, 1, -1j]]) / np.sqrt(2.0)
+        (w, E) = np.linalg.eig(sig.dot(S))
+        E = E / np.power(np.abs(np.linalg.det(E)), 0.25)
+        E = E[:,[1,0,3,2]] # reorder to make N symplectic
+        N = E.dot(Q)
+        N = N.real 
+        x = np.array([self.x,self.xp, self.y, self.yp])
+        x_new = np.linalg.solve(N, x)
+        Ju = 0.5*(x_new[0,:]**2 + x_new[1,:]**2)*(self.gamma*self.beta)
+        Jv = 0.5*(x_new[2,:]**2 + x_new[3,:]**2)*(self.gamma*self.beta)
+        return np.sqrt(Ju*Jv)
 
 #-----------------------------------------
 # helper functions for ParticleGroupExtension class
@@ -141,8 +161,8 @@ def convert_gpt_data(gpt_data_input):
     gpt_data = copy.deepcopy(gpt_data_input)  # This is lazy, should just make a new GPT()
     for i, pmd in enumerate(gpt_data_input.particles):
         gpt_data.particles[i] = ParticleGroupExtension(input_particle_group=pmd)  # This copies the data again
-    for tout in gpt_data.tout:
-        tout.drift_to_z() # Turn all the touts into quasi-screens
+    #for tout in gpt_data.tout:
+    #    tout.drift_to_z() # Turn all the touts into quasi-screens
     return gpt_data
 
 

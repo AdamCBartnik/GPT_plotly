@@ -90,12 +90,13 @@ def multirun_gpt_with_particlegroup(settings=None,
 
     # If here, either phasing successful, or no phasing requested
     G.run(gpt_verbose=gpt_verbose)
-                
+                        
     # Remove touts and screens that are after t_restart
-    G.output['n_tout'] = np.count_nonzero(G.stat('mean_t', 'tout') <= t_restart)
-    G.output['n_screen'] = np.count_nonzero(G.stat('mean_t', 'screen') <= t_restart)
+    t_restart_with_fudge = t_restart + 1.0e-18 # slightly larger that t_restart to avoid floating point comparison problem
+    G.output['n_tout'] = np.count_nonzero(G.stat('mean_t', 'tout') <= t_restart_with_fudge)
+    G.output['n_screen'] = np.count_nonzero(G.stat('mean_t', 'screen') <= t_restart_with_fudge)
     for p in reversed(G.particles):
-        if (p['mean_t'] > t_restart):
+        if (p['mean_t'] > t_restart_with_fudge):
             G.particles.remove(p)
     
     #G_all = copy.deepcopy(G)

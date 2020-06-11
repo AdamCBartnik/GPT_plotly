@@ -22,10 +22,14 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
     cmap = ["#%02x%02x%02x" % (int(r), int(g), int(b)) for r, g, b, _ in 255*mpl_cmap(range(mpl_cmap.N))]
     
     # Find good units for x data
-    (all_x, x_units, x_scale) = scale_and_get_units(gpt_data.stat(var1), gpt_data.stat_units(var1).unitSymbol)  # touts and screens for unit choices
-    x = gpt_data.stat(var1, 'tout') / x_scale
-    screen_x = gpt_data.stat(var1, 'screen') / x_scale
+    special_i = special_screens(gpt_data.stat('mean_z', 'screen'))
+    (all_x, x_units, x_scale) = scale_and_get_units(gpt_data.stat(var1, 'screen'), gpt_data.stat_units(var1).unitSymbol)
     
+    #x = gpt_data.stat(var1, 'tout') / x_scale
+    #screen_x = gpt_data.stat(var1, 'screen') / x_scale
+    x = all_x
+    screen_x = [xx for i, xx in enumerate(all_x) if i in special_i]
+        
     if (not isinstance(var2, list)):
         var2 = [var2]
 
@@ -42,7 +46,8 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
     for var in var2:
         if (gpt_data.stat_units(var).unitSymbol != all_y_base_units):
             raise ValueError('Plotting data with different units not allowed.')
-        all_y = np.concatenate((all_y, gpt_data.stat(var)))  # touts and screens for unit choices
+        #all_y = np.concatenate((all_y, gpt_data.stat(var)))  # touts and screens for unit choices
+        all_y = np.concatenate((all_y, gpt_data.stat(var, 'screen')))  # touts and screens for unit choices
 
     # In the case of emittance, use 2*median(y) as a the default scale, to avoid solenoid growth dominating the choice of scale
     use_median_y_strs = ['norm', 'slice']
@@ -54,7 +59,8 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
                 
     # Finally, actually plot the data
     for i, var in enumerate(var2):
-        y = gpt_data.stat(var, 'tout') / y_scale
+        #y = gpt_data.stat(var, 'tout') / y_scale
+        y = all_y
         legend_name = f'${format_label(var)}$'
         fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name=legend_name,
                         hovertemplate = '%{x}, %{y}<extra></extra>',
@@ -63,7 +69,8 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
                          )
                      ))
 
-        screen_y = gpt_data.stat(var, 'screen') / y_scale
+        #screen_y = gpt_data.stat(var, 'screen') / y_scale
+        screen_y = [yy for i, yy in enumerate(all_y) if i in special_i]
         legend_name = f'$\mbox{{Screen: }}{format_label(var)}$'
         fig.add_trace(go.Scatter(x=screen_x, y=screen_y, mode='markers', name=legend_name,
                          hovertemplate = '%{x}, %{y}<extra></extra>',

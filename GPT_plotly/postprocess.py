@@ -45,35 +45,30 @@ def postprocess_screen(screen, **params):
 
 def remove_spinning(screen):
     x = copy.copy(screen.x)
-    xp = copy.copy(screen.xp)
+    px = copy.copy(screen.px)
     y = copy.copy(screen.y)
-    yp = copy.copy(screen.yp)
+    py = copy.copy(screen.py)
     w = screen.weight
 
     sumw = np.sum(w)
 
     x = x - np.sum(x*w)/sumw
-    xp = xp - np.sum(xp*w)/sumw
+    px = px - np.sum(px*w)/sumw
     y = y - np.sum(y*w)/sumw
-    yp = yp - np.sum(yp*w)/sumw
+    py = py - np.sum(py*w)/sumw
 
     x2 = np.sum(x*x*w)/sumw
     y2 = np.sum(y*y*w)/sumw
 
-    u2 = (x2+y2)
+    xpy = np.sum(x*py*w)/sumw
+    ypx = np.sum(y*px*w)/sumw
 
-    xpy = np.sum(x*yp*w)/sumw
-    ypx = np.sum(y*xp*w)/sumw
-
-    L = (xpy-ypx)
-    C = -L/u2
+    C1 = -ypx/y2
+    C2 = -xpy/x2
     
-    xp = xp - C*y
-    yp = yp + C*x
+    screen.px = screen.px + C1*screen.y
+    screen.py = screen.py + C2*screen.x
         
-    screen.px = xp * screen.pz
-    screen.py = yp * screen.pz
-
     return screen
 
 def kill_zero_weight(screen):
