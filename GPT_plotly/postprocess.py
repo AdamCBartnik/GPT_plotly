@@ -5,19 +5,20 @@ import numpy.polynomial.polynomial as poly
 
 def postprocess_screen(screen, **params):
     
-    need_copy_params = ['take_slice', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 'radial_aperture', 'remove_spinning']
+    need_copy_params = ['take_slice', 'take_range', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 'radial_aperture', 'remove_spinning']
     need_copy = any([p in params for p in need_copy_params])
     
     if (need_copy):
         screen = copy.deepcopy(screen)
     
-    if ('radial_aperture' in params):
-        cutoff_radius = params['radial_aperture']
-        screen = radial_aperture(screen, cutoff_radius)
-    
     if ('kill_zero_weight' in params):
         if (params['kill_zero_weight']):
             screen = kill_zero_weight(screen)
+    
+    if ('take_range' in params):
+        (take_range_var, range_min, range_max) = params['take_range']
+        if (range_min < range_max):
+            screen = take_range(screen, take_range_var, range_min, range_max)
     
     if ('take_slice' in params):
         (take_slice_var, slice_index, n_slices) = params['take_slice']
@@ -91,11 +92,22 @@ def kill_zero_weight(screen):
     return screen
 
 
-def radial_aperture(screen, cutoff_radius):
-    r = screen.r
-    screen.weight[r>cutoff_radius] = 0
-    return screen
 
+def take_range(screen, take_range_var, range_min, range_max):
+    x = getattr(screen, take_range_var) 
+    
+    if (take_range_var in ['x','y','z','t']):
+        # Subtract mean
+        x = x - sum(x*screen.weight)/sum(screen.weight)
+    
+    out_of_range = np.logical_or(x < range_min, x > range_max)
+    
+    if (np.count_nonzero(out_of_range) < len(out_of_range)):
+        screen.weight[out_of_range] = 0.0
+    
+    return kill_zero_weight(screen)
+
+    
 def take_slice(screen, take_slice_var, slice_index, n_slices):
     p_list, edges, density_norm = divide_particles(screen, nbins=n_slices, key=take_slice_var)
     if (slice_index>=0 and slice_index<len(p_list)):

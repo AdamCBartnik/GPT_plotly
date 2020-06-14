@@ -311,7 +311,20 @@ def pad_data_with_zeros(edges_plt, hist_plt, sides=[True,True]):
     return (edges_plt, hist_plt)
 
     
+def check_subtract_mean(var):
+    subtract_mean = False
+    if (var in ['x', 'y', 'z', 't']):
+        subtract_mean = True
 
+    #subtract_mean = True
+    #if ('action' in var):
+    #    subtract_mean = False
+    #if (var in ['r', 'pr']):
+    #    subtract_mean = False
+        
+    return subtract_mean
+
+    
 
 def hist2d(fig, pmd, x, y, weights, color_var='density', bins=[100,100], colormap=mpl.cm.get_cmap('jet'), is_radial_var=[False,False]):
     force_zero = False
@@ -342,9 +355,8 @@ def hist2d(fig, pmd, x, y, weights, color_var='density', bins=[100,100], colorma
     else:
         q = color_var_data.weight
         
-        no_subtract_mean = ['r', 'pr']
         (c, c_units, c_scale, avgc, avgc_units, avgc_scale) = scale_mean_and_get_units(getattr(color_var_data, color_var), color_var_data.units(color_var).unitSymbol, 
-                                                                                       subtract_mean=(color_var not in no_subtract_mean), weights=q)
+                                                                                       subtract_mean=check_subtract_mean(color_var), weights=q)
         
         title_str = f'{color_var} ({format_label(c_units, latex=False)})'
 
@@ -420,9 +432,8 @@ def scatter_color(fig, pmd, x, y, weights=None, color_var='density', bins=100, c
     else:
         q = color_var_data.weight
         
-        no_subtract_mean = ['r', 'pr']
         (c, c_units, c_scale, avgc, avgc_units, avgc_scale) = scale_mean_and_get_units(getattr(color_var_data, color_var), color_var_data.units(color_var).unitSymbol, 
-                                                                                       subtract_mean=(color_var not in no_subtract_mean), weights=q)
+                                                                                       subtract_mean=check_subtract_mean(color_var), weights=q)
         
         title_str = f'{color_var} ({format_label(c_units, latex=False)})'
     

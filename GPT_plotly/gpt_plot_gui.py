@@ -64,10 +64,7 @@ def gpt_plot_gui(gpt_data_input):
     nbin_y_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
     
     remove_zero_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
-    
-    radial_aperture_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
-    radial_aperture_r_text = widgets.BoundedFloatText(value=1, min=0, layout=layout_150px)
-    
+        
     cyl_copies_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
     cyl_copies_text = widgets.BoundedIntText(value=50, min=10, max=500, step=1, layout=layout_150px)
     
@@ -82,6 +79,11 @@ def gpt_plot_gui(gpt_data_input):
     take_slice_var_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_list)], value=0, layout=layout_150px)
     take_slice_nslices_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
     take_slice_index_text = widgets.BoundedIntText(value=0, min=0, max=take_slice_nslices_text.value-1, step=1, layout=layout_150px)
+    
+    take_range_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
+    take_range_var_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_list)], value=0, layout=layout_150px)
+    take_range_min_text = widgets.FloatText(value=0, layout=layout_150px)
+    take_range_max_text = widgets.FloatText(value=0, layout=layout_150px)
     
         
     def make_plot():   
@@ -112,8 +114,6 @@ def gpt_plot_gui(gpt_data_input):
         nbins = [nbin_x_text.value, nbin_y_text.value]
         
         remove_zero_weight = remove_zero_checkbox.value and (plottype!='trends')
-        radial_aperture_on = radial_aperture_checkbox.value and (plottype!='trends')
-        radial_aperture_r = radial_aperture_r_text.value * 1.0e-3 # (mm)
         
         cyl_copies = cyl_copies_text.value
         cyl_copies_on = cyl_copies_checkbox.value and (plottype!='trends')
@@ -131,6 +131,11 @@ def gpt_plot_gui(gpt_data_input):
         take_slice_index = take_slice_index_text.value
         take_slice_nslices = take_slice_nslices_text.value
         take_slice_index_text.max = take_slice_nslices-1
+        
+        take_range = take_range_checkbox.value and (plottype!='trends')
+        take_range_var = take_range_var_dropdown.label
+        take_range_min = take_range_min_text.value
+        take_range_max = take_range_max_text.value
         
         is_trend = (plottype=='trends')
         is_dist1d = (plottype=='1d distribution')
@@ -172,8 +177,6 @@ def gpt_plot_gui(gpt_data_input):
                 params['screen_z'] = special_z_list[screen_z_dropdown.value]
             if (remove_zero_weight):
                 params['kill_zero_weight'] = remove_zero_weight
-            if (radial_aperture_on):
-                params['radial_aperture'] = radial_aperture_r
             if (cyl_copies_on):
                 params['cylindrical_copies'] = cyl_copies
             if (remove_spinning):
@@ -182,6 +185,8 @@ def gpt_plot_gui(gpt_data_input):
                 params['remove_correlation'] = (remove_correlation_var1, remove_correlation_var2, remove_correlation_n)
             if (take_slice):
                 params['take_slice'] = (take_slice_var, take_slice_index, take_slice_nslices)
+            if (take_range):
+                params['take_range'] = (take_range_var, take_range_min, take_range_max)
         else:
             if (is_slice_trend):
                 params['slice_key'] = trend_slice_var
@@ -274,8 +279,6 @@ def gpt_plot_gui(gpt_data_input):
     
     postprocess_tab = widgets.VBox([
         widgets.HBox([widgets.Label('Remove zero weight', layout=label_layout), remove_zero_checkbox]),
-        widgets.HBox([widgets.Label('Radial aperture', layout=label_layout), radial_aperture_checkbox]),
-        widgets.HBox([widgets.Label('Radius (mm)', layout=label_layout), radial_aperture_r_text]),
         widgets.HBox([widgets.Label('Cylindrical copies', layout=label_layout), cyl_copies_checkbox]),
         widgets.HBox([widgets.Label('Number of copies', layout=label_layout), cyl_copies_text]),
         widgets.HBox([widgets.Label('Remove Spinning', layout=label_layout), remove_spinning_checkbox]),
@@ -283,15 +286,22 @@ def gpt_plot_gui(gpt_data_input):
         widgets.HBox([widgets.Label('Max polynomial power', layout=label_layout), remove_correlation_n_text]),
         widgets.HBox([widgets.Label('Independent var (x)', layout=label_layout), remove_correlation_var1_dropdown]), 
         widgets.HBox([widgets.Label('Dependent var (y)', layout=label_layout), remove_correlation_var2_dropdown]),
+    ], description='Postprocessing')
+    
+    slicing_tab = widgets.VBox([
         widgets.HBox([widgets.Label('Take slice of data', layout=label_layout), take_slice_checkbox]), 
         widgets.HBox([widgets.Label('Slice variable', layout=label_layout), take_slice_var_dropdown]), 
         widgets.HBox([widgets.Label('Slice index', layout=label_layout), take_slice_index_text]), 
-        widgets.HBox([widgets.Label('Number of slices', layout=label_layout), take_slice_nslices_text])
+        widgets.HBox([widgets.Label('Number of slices', layout=label_layout), take_slice_nslices_text]),
+        widgets.HBox([widgets.Label('Take range of data', layout=label_layout), take_range_checkbox]), 
+        widgets.HBox([widgets.Label('Range variable', layout=label_layout), take_range_var_dropdown]), 
+        widgets.HBox([widgets.Label('Range min', layout=label_layout), take_range_min_text]), 
+        widgets.HBox([widgets.Label('Range max', layout=label_layout), take_range_max_text])
     ], description='Postprocessing')
     
     # Make tab panel
-    tab_list = [trends_tab, dist_1d_tab, dist_2d_tab, postprocess_tab]
-    tab_label_list = ['Trends', '1D Dist.', '2D Dist.', 'Postprocess']
+    tab_list = [trends_tab, dist_1d_tab, dist_2d_tab, postprocess_tab, slicing_tab]
+    tab_label_list = ['Trends', '1D Dist.', '2D Dist.', 'Postproc.', 'Slicing']
     tab_panel.children = tab_list
     for i,t in enumerate(tab_label_list):
         tab_panel.set_title(i, t)
@@ -343,11 +353,13 @@ def gpt_plot_gui(gpt_data_input):
     take_slice_var_dropdown.observe(remake_on_value_change, names='value')
     take_slice_index_text.observe(remake_on_value_change, names='value')
     take_slice_nslices_text.observe(remake_on_value_change, names='value')
+    take_range_checkbox.observe(remake_on_value_change, names='value')
+    take_range_var_dropdown.observe(remake_on_value_change, names='value')
+    take_range_min_text.observe(remake_on_value_change, names='value')
+    take_range_max_text.observe(remake_on_value_change, names='value')
     trend_slice_var_dropdown.observe(remake_on_value_change, names='value')
     trend_slice_nslices_text.observe(remake_on_value_change, names='value')
     remove_zero_checkbox.observe(remake_on_value_change, names='value')
-    radial_aperture_checkbox.observe(remake_on_value_change, names='value')
-    radial_aperture_r_text.observe(remake_on_value_change, names='value')
         
     return gui
 
