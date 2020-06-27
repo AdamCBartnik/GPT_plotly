@@ -10,8 +10,8 @@ import copy
 class ParticleGroupExtension(ParticleGroup):
     
     def __init__(self, input_particle_group=None, data=None):
-        n_slices = 50
-        slice_key = 't'
+        self.n_slices = 50
+        self.slice_key = 't'
         
         if (input_particle_group):
             data={}
@@ -158,7 +158,7 @@ def slice_emit(p_list, key):
 
 
 def convert_gpt_data(gpt_data_input):
-    gpt_data = copy.deepcopy(gpt_data_input)  # This is lazy, should just make a new GPT()
+    gpt_data = copy.deepcopy(gpt_data_input)
     for i, pmd in enumerate(gpt_data_input.particles):
         gpt_data.particles[i] = ParticleGroupExtension(input_particle_group=pmd)  # This copies the data again
     #for tout in gpt_data.tout:

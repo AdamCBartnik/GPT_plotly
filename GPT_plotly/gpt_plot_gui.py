@@ -35,14 +35,16 @@ def gpt_plot_gui(gpt_data_input):
     screen_z_dropdown = widgets.Dropdown(options=[(f'{z:.3f}', i) for (i,z) in enumerate(special_z_list)], layout=layout_150px)
     
     trend_x_list = ['z', 't']
-    trend_y_list = ['Beam Size', 'Bunch Length', 'Emittance (x,y)', 'Emittance (4D)', 'Slice emit. (x,y)', 'Slice emit. (4D)', 'Charge', 'Energy', 'Trajectory']
+    trend_y_list = ['Beam Size', 'Bunch Length', 'Emittance (x,y)', 'Emittance (4D)', 'Slice emit. (x,y)', 'Slice emit. (4D)', 'Charge', 'Energy', 'Energy Spread', 'Trajectory']
     trend_x_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(trend_x_list)], value=0, layout=layout_150px)
     trend_y_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(trend_y_list)], value=0, layout=layout_150px)
     trend_slice_var_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_list)], value=0, layout=layout_150px)
     trend_slice_nslices_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
+    trend_survivors_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
+    trend_survivors_screen_z_dropdown = widgets.Dropdown(options=[(f'{z:.3f}', i) for (i,z) in enumerate(screen_z_list)], layout=layout_100px)
     
     dist_x_1d_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_list)], value=0, layout=layout_150px)
-    dist_type_1d_list = ['Charge Density', 'Emittance X', 'Emittance Y', 'Emittance 4D', 'Sigma X', 'Sigma Y']
+    dist_type_1d_list = ['Charge Density', 'Emittance X', 'Emittance Y', 'Emittance 4D', 'Sigma X', 'Sigma Y', 'Sigma E']
     dist_type_1d_dropdown = widgets.Dropdown(options=[(a, i) for (i,a) in enumerate(dist_type_1d_list)], value=0, layout=layout_150px)
     nbin_1d_text = widgets.BoundedIntText(value=50, min=5, max=500, step=1, layout=layout_150px)
     
@@ -99,6 +101,9 @@ def gpt_plot_gui(gpt_data_input):
         trend_y = trend_y_dropdown.label
         trend_slice_var = trend_slice_var_dropdown.label
         trend_slice_nslices = trend_slice_nslices_text.value
+        show_survivors_at_z = None
+        if (trend_survivors_checkbox.value):
+            show_survivors_at_z = screen_z_list[trend_survivors_screen_z_dropdown.value]
         
         dist_x_1d = dist_x_1d_dropdown.label
         dist_y_1d = dist_type_1d_dropdown.label
@@ -113,26 +118,26 @@ def gpt_plot_gui(gpt_data_input):
         axis_equal = axis_equal_checkbox.value
         nbins = [nbin_x_text.value, nbin_y_text.value]
         
-        remove_zero_weight = remove_zero_checkbox.value and (plottype!='trends')
+        remove_zero_weight = remove_zero_checkbox.value
         
         cyl_copies = cyl_copies_text.value
-        cyl_copies_on = cyl_copies_checkbox.value and (plottype!='trends')
+        cyl_copies_on = cyl_copies_checkbox.value
         cyl_copies_text.disabled = not cyl_copies_on
         
-        remove_spinning = remove_spinning_checkbox.value and (plottype!='trends')
+        remove_spinning = remove_spinning_checkbox.value
         
-        remove_correlation = remove_correlation_checkbox.value and (plottype!='trends')
+        remove_correlation = remove_correlation_checkbox.value
         remove_correlation_n = remove_correlation_n_text.value
         remove_correlation_var1 = remove_correlation_var1_dropdown.label
         remove_correlation_var2 = remove_correlation_var2_dropdown.label
         
-        take_slice = take_slice_checkbox.value and (plottype!='trends')
+        take_slice = take_slice_checkbox.value
         take_slice_var = take_slice_var_dropdown.label
         take_slice_index = take_slice_index_text.value
         take_slice_nslices = take_slice_nslices_text.value
         take_slice_index_text.max = take_slice_nslices-1
         
-        take_range = take_range_checkbox.value and (plottype!='trends')
+        take_range = take_range_checkbox.value
         take_range_var = take_range_var_dropdown.label
         take_range_min = take_range_min_text.value
         take_range_max = take_range_max_text.value
@@ -150,6 +155,7 @@ def gpt_plot_gui(gpt_data_input):
         trend_y_dropdown.disabled = not is_trend
         trend_slice_var_dropdown.disabled = not is_slice_trend
         trend_slice_nslices_text.disabled = not is_slice_trend
+        trend_survivors_screen_z_dropdown.disabled = not trend_survivors_checkbox.value
         
         dist_type_1d_dropdown.disabled = not is_dist1d
         dist_x_1d_dropdown.disabled = not is_dist1d
@@ -170,24 +176,25 @@ def gpt_plot_gui(gpt_data_input):
         
         # Add extra parameters to pass into plotting functions
         params = {}
-        if (not is_trend):
-            if (screen_type_dropdown.label.lower() == 'all'):
-                params['screen_z'] = screen_z_list[screen_z_dropdown.value]
-            if (screen_type_dropdown.label.lower() == 'special'):
-                params['screen_z'] = special_z_list[screen_z_dropdown.value]
-            if (remove_zero_weight):
-                params['kill_zero_weight'] = remove_zero_weight
-            if (cyl_copies_on):
-                params['cylindrical_copies'] = cyl_copies
-            if (remove_spinning):
-                params['remove_spinning'] = remove_spinning
-            if (remove_correlation):
-                params['remove_correlation'] = (remove_correlation_var1, remove_correlation_var2, remove_correlation_n)
-            if (take_slice):
-                params['take_slice'] = (take_slice_var, take_slice_index, take_slice_nslices)
-            if (take_range):
-                params['take_range'] = (take_range_var, take_range_min, take_range_max)
-        else:
+#        if (not is_trend):
+        if (screen_type_dropdown.label.lower() == 'all'):
+            params['screen_z'] = screen_z_list[screen_z_dropdown.value]
+        if (screen_type_dropdown.label.lower() == 'special'):
+            params['screen_z'] = special_z_list[screen_z_dropdown.value]
+        if (remove_zero_weight):
+            params['kill_zero_weight'] = remove_zero_weight
+        if (cyl_copies_on):
+            params['cylindrical_copies'] = cyl_copies
+        if (remove_spinning):
+            params['remove_spinning'] = remove_spinning
+        if (remove_correlation):
+            params['remove_correlation'] = (remove_correlation_var1, remove_correlation_var2, remove_correlation_n)
+        if (take_slice):
+            params['take_slice'] = (take_slice_var, take_slice_index, take_slice_nslices)
+        if (take_range):
+            params['take_range'] = (take_range_var, take_range_min, take_range_max)
+        if (is_trend):
+            params['show_survivors_at_z'] = show_survivors_at_z
             if (is_slice_trend):
                 params['slice_key'] = trend_slice_var
                 params['n_slices'] = trend_slice_nslices
@@ -254,7 +261,9 @@ def gpt_plot_gui(gpt_data_input):
         widgets.HBox([widgets.Label('X axis', layout=label_layout), trend_x_dropdown]),
         widgets.HBox([widgets.Label('Y axis', layout=label_layout), trend_y_dropdown]),
         widgets.HBox([widgets.Label('Slice variable', layout=label_layout), trend_slice_var_dropdown]),
-        widgets.HBox([widgets.Label('Number of slices', layout=label_layout), trend_slice_nslices_text])
+        widgets.HBox([widgets.Label('Number of slices', layout=label_layout), trend_slice_nslices_text]),
+        widgets.HBox([widgets.Label('Only show survivors', layout=label_layout), trend_survivors_checkbox]),
+        widgets.HBox([widgets.Label('Survivor screen', layout=label_layout), trend_survivors_screen_z_dropdown])
     ])
     
     dist_1d_tab = widgets.VBox([
@@ -324,6 +333,8 @@ def gpt_plot_gui(gpt_data_input):
     plottype_dropdown.observe(remake_on_value_change, names='value')
     trend_x_dropdown.observe(remake_on_value_change, names='value')
     trend_y_dropdown.observe(remake_on_value_change, names='value')
+    trend_survivors_checkbox.observe(remake_on_value_change, names='value')
+    trend_survivors_screen_z_dropdown.observe(remake_on_value_change, names='value')
     dist_x_1d_dropdown.observe(remake_on_value_change, names='value')
     dist_x_dropdown.observe(remake_on_value_change, names='value')
     dist_y_dropdown.observe(remake_on_value_change, names='value')

@@ -5,8 +5,11 @@ import numpy.polynomial.polynomial as poly
 
 def postprocess_screen(screen, **params):
     
-    need_copy_params = ['take_slice', 'take_range', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 'radial_aperture', 'remove_spinning']
+    need_copy_params = ['take_slice', 'take_range', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 'radial_aperture', 'remove_spinning', 'include_ids']
     need_copy = any([p in params for p in need_copy_params])
+    
+    if ('need_copy' in params):
+        need_copy = params['need_copy']
     
     if (need_copy):
         screen = copy.deepcopy(screen)
@@ -14,6 +17,11 @@ def postprocess_screen(screen, **params):
     if ('kill_zero_weight' in params):
         if (params['kill_zero_weight']):
             screen = kill_zero_weight(screen)
+    
+    if ('include_ids' in params):
+        ids = params['include_ids']
+        if (len(ids) > 0):
+            screen = include_ids(screen, ids)
     
     if ('take_range' in params):
         (take_range_var, range_min, range_max) = params['take_range']
@@ -42,6 +50,14 @@ def postprocess_screen(screen, **params):
     return screen
 
 
+
+def include_ids(screen, ids):
+    id_to_index = {id : i for i,id in enumerate(screen.id)}
+    ids_to_zero = np.setdiff1d(screen.id, ids, assume_unique=True)
+    ind_to_zero = [id_to_index[id] for id in ids_to_zero]
+    screen.weight[ind_to_zero] = 0.0
+    
+    return kill_zero_weight(screen)
 
 
 def remove_spinning(screen):

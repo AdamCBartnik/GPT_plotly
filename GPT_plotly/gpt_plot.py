@@ -9,11 +9,25 @@ from pmd_beamphysics.units import c_light, e_charge
 from .ParticleGroupExtension import ParticleGroupExtension, convert_gpt_data, divide_particles
 from ipywidgets import HBox
 
-def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data=True, **params):
+def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data=True, show_survivors_at_z=None, **params):
     if (format_input_data):
         gpt_data = convert_gpt_data(gpt_data_input)
     else:
-        gpt_data = gpt_data_input
+        gpt_data = copy.deepcopy(gpt_data_input)
+        
+    if (show_survivors_at_z is not None):
+        survivor_params = {}
+        survivor_params['screen_z'] = show_survivors_at_z
+        pmd, _, _ = get_screen_data(gpt_data, **survivor_params)
+        pmd = postprocess_screen(pmd, **params)
+        survivor_ids = pmd.id[pmd.weight > 0]
+
+        survivor_params = {}
+        survivor_params['include_ids'] = survivor_ids
+        survivor_params['need_copy'] = False
+        for i, s in enumerate(gpt_data.particles):
+            gpt_data.particles[i] = postprocess_screen(s, **survivor_params)
+
     
     fig = make_default_plot(fig, plot_width=600, plot_height=400, **params)
     
@@ -85,7 +99,9 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
     ylabel_str = get_y_label(var2)
     fig.update_xaxes(title_text=f"${format_label(var1, use_base=True)} \, ({x_units})$")
     fig.update_yaxes(title_text=f"${ylabel_str} \, ({y_units})$")
-    
+        
+    #fig.update_xaxes(title_font=dict(size=18))
+        
     # Turn off legend if not desired
     if('legend' in params):
         if (isinstance(params['legend'], bool)):
@@ -211,6 +227,11 @@ def gpt_plot_dist1d(pmd, var, plot_type='charge', units=None, fig=None, table_fi
         y_axis_label=f"${plot_type_label} \, ({plot_type_units})$"
     
     fig.update_yaxes(title_text=y_axis_label)
+    
+    if ('xlim' in params):
+        fig.update_xaxes(range=params['xlim'])
+    if ('ylim' in params):
+        fig.update_yaxes(range=params['ylim'])
     
     stdx = std_weights(x,q)
     

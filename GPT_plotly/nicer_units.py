@@ -28,7 +28,7 @@ def nicer_scale_prefix(scale, mm_cutoff=0.1):
 
 
 
-def nicer_array(a, mm_cutoff=0.1):
+def nicer_array(a, mm_cutoff=0.3):
     """
     Returns a scaled array, the scaling, and a unit prefix
     

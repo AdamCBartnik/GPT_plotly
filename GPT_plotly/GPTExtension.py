@@ -101,7 +101,9 @@ def multirun_gpt_with_particlegroup(settings=None,
     
     #G_all = copy.deepcopy(G)
     G_all = G
-                
+        
+    if (verbose):
+        print(f'Looking for tout at t = {t_restart}')
     restart_particles = get_screen_data(G, tout_t = t_restart, use_extension=False, verbose=verbose)[0]
     
     if ('clipping_charge' in settings):

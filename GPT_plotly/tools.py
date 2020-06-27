@@ -21,6 +21,8 @@ def get_dist_plot_type(dist_y):
         var='sigma_x'
     if (dist_y == 'sigma y'):
         var='sigma_y'
+    if (dist_y == 'sigma e'):
+        var='sigma_energy'
     
     return var
 
@@ -41,6 +43,8 @@ def get_trend_vars(trend_y):
         var=['slice_emit_4d']
     if (trend_y == 'energy'):
         var='mean_energy'
+    if (trend_y == 'energy spread'):
+        var='sigma_energy'
     if (trend_y == 'trajectory'):
         var=['mean_x', 'mean_y']
     if (trend_y == 'charge'):
@@ -209,7 +213,10 @@ def get_screen_data(gpt_data, verbose=False, use_extension=True, **params):
         screen_index = np.argmin(np.abs(values-screen_value))
         found_screen_value = values[screen_index]
         if (verbose):
-            print(f'Found screen at {screen_key} = {values[screen_index]}')
+            if (use_touts):
+                print(f'Found tout at {screen_key} = {values[screen_index]}')
+            else:
+                print(f'Found screen at {screen_key} = {values[screen_index]}')
     else:
         if (verbose):
             print('Defaulting to screen[0]')
