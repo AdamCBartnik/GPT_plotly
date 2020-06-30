@@ -2,10 +2,12 @@ import numpy as np
 import copy
 from .ParticleGroupExtension import ParticleGroupExtension, divide_particles
 import numpy.polynomial.polynomial as poly
+from random import shuffle
 
 def postprocess_screen(screen, **params):
     
-    need_copy_params = ['take_slice', 'take_range', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 'radial_aperture', 'remove_spinning', 'include_ids']
+    need_copy_params = ['take_slice', 'take_range', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 
+                        'radial_aperture', 'remove_spinning', 'include_ids', 'random_N', 'first_N']
     need_copy = any([p in params for p in need_copy_params])
     
     if ('need_copy' in params):
@@ -46,9 +48,27 @@ def postprocess_screen(screen, **params):
         (remove_correlation_var1, remove_correlation_var2, remove_correlation_n) = params['remove_correlation']
         if (remove_correlation_n >= 0):
             screen = remove_correlation(screen, remove_correlation_var1, remove_correlation_var2, remove_correlation_n)
+    
+    if ('random_N' in params):
+        N = params['random_N']
+        if (N > 0):
+            screen = random_N(screen, N, random=True)
+    else:
+        if ('first_N' in params):
+            N = params['first_N']
+            if (N > 0):
+                screen = random_N(screen, N, random=False)
         
     return screen
 
+
+def random_N(screen, N, random=True):
+    alive_ids = screen.id[screen.weight > 0]
+    if (random):
+        shuffle(alive_ids)
+    if (N < len(alive_ids)):
+        alive_ids = alive_ids[0:N]
+    return include_ids(screen, alive_ids)
 
 
 def include_ids(screen, ids):

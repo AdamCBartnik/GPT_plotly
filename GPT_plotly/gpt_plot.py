@@ -123,7 +123,70 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
     return fig
     
 
+
+def gpt_plot_trajectory(gpt_data_input, var1, var2, fig=None, format_input_data=True, **params):
+    if (format_input_data):
+        gpt_data = convert_gpt_data(gpt_data_input)
+    else:
+        gpt_data = copy.deepcopy(gpt_data_input)
+        
+    fig = make_default_plot(fig, plot_width=500, plot_height=400, **params)
+        
+    # Get set of particle IDs to plot trajectories of
+    pmd, _, _ = get_screen_data(gpt_data_input, **params)
+    pmd = postprocess_screen(pmd, **params)
+    plot_ids = pmd.id[pmd.weight > 0]
     
+    if(len(plot_ids)==0):
+        return None
+
+    charge_base_units = pmd.units('charge').unitSymbol
+    q_total, charge_scale, charge_prefix = nicer_array(pmd.charge)
+    q = pmd.weight / charge_scale
+    q_units = check_mu(charge_prefix)+charge_base_units
+    
+    x = np.empty( (len(gpt_data.screen),len(plot_ids)) )
+    y = np.empty( (len(gpt_data.screen),len(plot_ids)) )
+    
+    for i, s in enumerate(gpt_data.screen):
+        index = np.argsort(s.id)
+        sorted_s_id = s.id[index]
+        sorted_index = np.searchsorted(sorted_s_id, plot_ids)
+
+        found_index = np.take(index, sorted_index, mode="clip")
+        mask = s.id[found_index] != plot_ids
+
+        index_of_found_ids = np.ma.array(found_index, mask=mask)
+        x[i,:] = getattr(s, var1)[index_of_found_ids]
+        x[i,index_of_found_ids.mask] = np.nan
+        y[i,:] = getattr(s, var2)[index_of_found_ids]
+        y[i,index_of_found_ids.mask] = np.nan
+            
+    all_x = x.flatten()
+    all_x = all_x[np.logical_not(np.isnan(all_x))]
+    (_, x_units, x_scale, _, _, _) = scale_mean_and_get_units(all_x, pmd.units(var1).unitSymbol, subtract_mean=False)
+    x = x/x_scale
+    
+    all_y = y.flatten()
+    all_y = all_y[np.logical_not(np.isnan(all_y))]
+    (_, y_units, y_scale, _, _, _) = scale_mean_and_get_units(all_y, pmd.units(var2).unitSymbol, subtract_mean=False)
+    y = y/y_scale
+    
+    for j, id in enumerate(plot_ids):
+        fig.add_trace(go.Scattergl(x=x[:,j], y=y[:,j], mode='lines',
+                    hoverinfo="none"   # hovertemplate = '%{x}, %{y}<extra></extra>',
+                 ))
+        
+    fig.update_layout(showlegend=False)
+    fig.update_xaxes(title_text=f"${format_label(var1)} \, ({x_units})$")
+    fig.update_yaxes(title_text=f"${format_label(var2)} \, ({y_units})$")    
+    
+    if ('xlim' in params):
+        fig.update_xaxes(range=params['xlim'])
+    if ('ylim' in params):
+        fig.update_yaxes(range=params['ylim'])
+    
+    return fig
     
 
 def gpt_plot_dist1d(pmd, var, plot_type='charge', units=None, fig=None, table_fig=None, table_on=True, **params):
