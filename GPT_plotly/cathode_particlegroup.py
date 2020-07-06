@@ -2,9 +2,10 @@ import yaml, copy
 import numpy as np
 from distgen import Generator
 from distgen.tools import update_nested_dict
-
+from pint import UnitRegistry
 
 def get_cathode_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=False, distgen_verbose=False, id_start=1):
+    unit_registry = UnitRegistry()
     settings = copy.copy(settings_input)
     
     distgen_input = yaml.safe_load(open(DISTGEN_INPUT_FILE))
@@ -13,9 +14,15 @@ def get_cathode_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=False,
     gen = Generator(distgen_input,verbose=distgen_verbose)
     gen.run()
     PG = gen.particles
-
+    
     if ('cathode:sigma_xy' in settings):
-        sigma_xy = settings.pop('cathode:sigma_xy') # remove from dictionary to avoid recursion problem
+        raise ValueError('cathode:sigma_xy is deprecated, please specify value and units instead.')
+    if ('cathode:sigma_xy:value' in settings and 'cathode:sigma_xy:units' in settings):
+        sigma_xy_value = settings.pop('cathode:sigma_xy:value') # remove from dictionary to avoid recursion problem
+        sigma_xy_units = settings.pop('cathode:sigma_xy:units') # remove from dictionary to avoid recursion problem
+        sigma_xy = sigma_xy_value * unit_registry.parse_expression(sigma_xy_units)
+        sigma_xy = sigma_xy.to('m').magnitude # convert to meters
+        
         sig_ratio = sigma_xy/(0.5*(PG['sigma_x'] + PG['sigma_y']))
         settings_1 = copy.copy(settings)
         
@@ -36,25 +43,56 @@ def get_cathode_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=False,
     
 
 def get_coreshield_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=False, distgen_verbose=False):
+    unit_registry = UnitRegistry()
     settings = copy.copy(settings_input)
     
-    if ('coreshield:n_core' in settings):
-        n_core = settings['coreshield:n_core']
+    all_settings = yaml.safe_load(open(DISTGEN_INPUT_FILE))
+    for k, v in settings.items():
+        all_settings = update_nested_dict(all_settings, {k:v}, verbose=False, create_new=True)
+    
+    if ('coreshield' not in all_settings):
+        raise ValueError('No coreshield settings specificed.')
+    
+    coreshield_settings = all_settings['coreshield']
+    
+    if ('n_core' in coreshield_settings):
+        n_core = coreshield_settings['n_core']
+    else:
+        raise ValueError('Please specify n_core.')
+    
+    if ('n_shield' in coreshield_settings):
+        n_shield = coreshield_settings['n_shield']
+    else:
+        raise ValueError('Please specify n_shield.')
         
-    if ('coreshield:n_shield' in settings):
-        n_shield = settings['coreshield:n_shield']
-        
-    core_charge_fraction = 0.5
-    if ('coreshield:core_charge_fraction' in settings):
-        core_charge_fraction = settings['coreshield:core_charge_fraction']
-        if (core_charge_fraction < 0.0 or core_charge_fraction > 1.0):
-            core_charge_fraction = 0.5
+    if ('core_charge_fraction' in coreshield_settings):
+        raise ValueError('core_charge_fraction is deprecated, please use core_charge instead.')
+    if ('core_charge' not in coreshield_settings):
+        if ('final_charge' in all_settings):
             if (verbose):
-                print('Invalid core charge fraction, defaulting to 0.5')
+                print('Defaulting to core charge = final charge.')
+            core_charge = all_settings['final_charge']['value'] * unit_registry.parse_expression(all_settings['final_charge']['units'])
+            core_charge_fraction = core_charge.to(all_settings['total_charge']['units']).magnitude / all_settings['total_charge']['value']
+        else:
+            if (verbose):
+                print('Defaulting to half of the charge in the core.')
+            core_charge_fraction = 0.5
+    else:
+        core_charge = coreshield_settings['core_charge']['value'] * unit_registry.parse_expression(coreshield_settings['core_charge']['units'])
+        core_charge_fraction = core_charge.to(all_settings['total_charge']['units']).magnitude / all_settings['total_charge']['value']
+    if (core_charge_fraction < 0.0 or core_charge_fraction > 1.0):
+        core_charge_fraction = 0.5
+        if (verbose):
+            print('Invalid core charge fraction, defaulting to 0.5')
     
     sigma_xy = None
     if ('cathode:sigma_xy' in settings):
-        sigma_xy = settings.pop('cathode:sigma_xy') # Remove from dictionary so that calls to get_cathode_particlegroup do not see it
+        raise ValueError('cathode:sigma_xy is deprecated, please specify value and units instead.')
+    if ('cathode:sigma_xy:value' in settings and 'cathode:sigma_xy:units' in settings):
+        sigma_xy_value = settings.pop('cathode:sigma_xy:value') # Remove from dictionary so that calls to get_cathode_particlegroup do not see it
+        sigma_xy_units = settings.pop('cathode:sigma_xy:units') # Remove from dictionary so that calls to get_cathode_particlegroup do not see it
+        sigma_xy = sigma_xy_value * unit_registry.parse_expression(sigma_xy_units)
+        sigma_xy = sigma_xy.to('m').magnitude # convert to meters
     
     PG = get_cathode_particlegroup(settings, DISTGEN_INPUT_FILE, verbose=False)
         

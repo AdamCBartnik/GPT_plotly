@@ -9,6 +9,7 @@ from .postprocess import kill_zero_weight
 from .cathode_particlegroup import get_coreshield_particlegroup
 from gpt.merit import default_gpt_merit
 from gpt.gpt_distgen import fingerprint_gpt_with_distgen
+from pint import UnitRegistry
 
 def multirun_gpt_with_particlegroup(settings=None,
                              gpt_input_file=None,
@@ -29,6 +30,8 @@ def multirun_gpt_with_particlegroup(settings=None,
         
     """
 
+    unit_registry = UnitRegistry()
+    
     # Call simpler evaluation if there is no input_particle_group:
     if (input_particle_group is None):
         raise ValueError('Must supply input_particle_group')
@@ -51,6 +54,11 @@ def multirun_gpt_with_particlegroup(settings=None,
             
     G.set_variable('multi_run',0)
             
+    if ('clipping_charge' in settings):
+        raise ValueError('clipping_charge is deprecated, please specify value and units instead.')
+    if ('final_charge' in settings):
+        raise ValueError('final_charge is deprecated, please specify value and units instead.')    
+    
     # Run
     if(auto_phase): 
 
@@ -106,8 +114,10 @@ def multirun_gpt_with_particlegroup(settings=None,
         print(f'Looking for tout at t = {t_restart}')
     restart_particles = get_screen_data(G, tout_t = t_restart, use_extension=False, verbose=verbose)[0]
     
-    if ('clipping_charge' in settings):
-        clip_to_charge(restart_particles, settings['clipping_charge'])
+    if ('clipping_charge:value' in settings and 'clipping_charge:units' in settings):
+        clipping_charge = settings['clipping_charge:value'] * unit_registry.parse_expression(settings['clipping_charge:units'])
+        clipping_charge = clipping_charge.to('coulomb').magnitude
+        clip_to_charge(restart_particles, clipping_charge)
         
     G = GPT(gpt_bin=gpt_bin, input_file=gpt_input_file, initial_particles=restart_particles, workdir=workdir, use_tempdir=use_tempdir)
     G.timeout = timeout
@@ -125,8 +135,10 @@ def multirun_gpt_with_particlegroup(settings=None,
     G_all.output['n_tout'] = G_all.output['n_tout']+G.output['n_tout']
     G_all.output['n_screen'] = G_all.output['n_screen']+G.output['n_screen']
     
-    if ('final_charge' in settings and len(G_all.screen)>0):
-        clip_to_charge(G_all.screen[-1], settings['final_charge'])
+    if ('final_charge:value' in settings and 'final_charge:units' in settings and len(G_all.screen)>0):
+        final_charge = settings['final_charge:value'] * unit_registry.parse_expression(settings['final_charge:units'])
+        final_charge = final_charge.to('coulomb').magnitude
+        clip_to_charge(G_all.screen[-1], final_charge)
         
     if (input_particle_group['sigma_t'] == 0.0):
         # Initial distribution is a tout
@@ -176,7 +188,9 @@ def evaluate_multirun_gpt_with_particlegroup(settings,
     """
     Will raise an exception if there is an error. 
     """
-    
+    if ('final_charge' in settings and 'coreshield:core_charge_fraction' not in settings):
+        settings['coreshield:core_charge_fraction'] = 0.5
+        
     input_particle_group = get_coreshield_particlegroup(settings, distgen_input_file, verbose=verbose)
     
     G = multirun_gpt_with_particlegroup(settings=settings,

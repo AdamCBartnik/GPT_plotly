@@ -120,6 +120,11 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
     if (any(any(substr in varstr for substr in use_median_y_strs) for varstr in var2)):
         fig.update_yaxes(range=[0, 2.0*np.median(all_y)])
         
+    if ('xlim' in params):
+        fig.update_xaxes(range=params['xlim'])
+    if ('ylim' in params):
+        fig.update_yaxes(range=params['ylim'])
+    
     return fig
     
 
