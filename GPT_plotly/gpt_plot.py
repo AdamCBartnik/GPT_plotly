@@ -27,7 +27,14 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
         survivor_params['need_copy'] = False
         for i, s in enumerate(gpt_data.particles):
             gpt_data.particles[i] = postprocess_screen(s, **survivor_params)
-
+    else:
+        if ('include_ids' in params):
+            survivor_params = {}
+            survivor_params['include_ids'] = params['include_ids']
+            survivor_params['need_copy'] = False
+            for i, s in enumerate(gpt_data.particles):
+                gpt_data.particles[i] = postprocess_screen(s, **survivor_params)
+        
     
     fig = make_default_plot(fig, plot_width=600, plot_height=400, **params)
     

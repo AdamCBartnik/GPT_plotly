@@ -3,7 +3,6 @@ from pmd_beamphysics.units import unit, PARTICLEGROUP_UNITS
 from pmd_beamphysics.statistics import norm_emit_calc
 from matplotlib import pyplot as plt
 import numpy.polynomial.polynomial as poly
-import scipy.optimize as optimize
 import numpy as np
 import copy
 
@@ -25,6 +24,7 @@ class ParticleGroupExtension(ParticleGroup):
         
         new_units = {}
         new_units['sqrt_norm_emit_4d'] = 'm'
+        new_units['root_norm_emit_6d'] = 'm'
         new_units['slice_emit_x'] = 'm'
         new_units['slice_emit_y'] = 'm'
         new_units['core_emit_x'] = 'm'
@@ -62,6 +62,12 @@ class ParticleGroupExtension(ParticleGroup):
     def sqrt_norm_emit_4d(self):
         return np.sqrt(norm_emit_calc(self, planes=['x', 'y']))
 
+    @property
+    def root_norm_emit_6d(self):
+        pg = copy.deepcopy(self)
+        pg.drift_to_t()
+        return np.power(norm_emit_calc(pg, planes=['x', 'y', 'z']), 1.0/3.0)
+    
     @property
     def slice_emit_x(self):
         (p_list, _, _) = divide_particles(self, nbins = self.n_slices, key=self.slice_key)

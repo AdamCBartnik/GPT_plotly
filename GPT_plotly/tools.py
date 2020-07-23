@@ -17,6 +17,8 @@ def get_dist_plot_type(dist_y):
         var='norm_emit_y'
     if (dist_y == 'emittance 4d'):
         var='sqrt_norm_emit_4d'
+    if (dist_y == 'emittance 6d'):
+        var='root_norm_emit_6d'
     if (dist_y == 'sigma x'):
         var='sigma_x'
     if (dist_y == 'sigma y'):
@@ -37,6 +39,8 @@ def get_trend_vars(trend_y):
         var=['norm_emit_x', 'norm_emit_y']
     if (trend_y == 'emittance (4d)'):
         var=['sqrt_norm_emit_4d']
+    if (trend_y == 'emittance (6d)'):
+        var=['root_norm_emit_6d']
     if (trend_y == 'slice emit. (x,y)'):
         var=['slice_emit_x', 'slice_emit_y']
     if (trend_y == 'slice emit. (4d)'):
@@ -67,9 +71,11 @@ def format_label(s, latex=True, use_base=False, add_underscore=True):
         s = s.replace('theta', '\theta')
         s = s.replace('slice_emit', '\mbox{Slice }\epsilon')
         s = s.replace('sqrt_norm_emit', '\epsilon')
+        s = s.replace('root_norm_emit', '\epsilon')
         s = s.replace('norm_emit', '\epsilon')
         s = s.replace('emit', '\epsilon')
         s = s.replace('4d','{4d}')
+        s = s.replace('6d','{6d}')
         s = s.replace('charge','\mbox{charge }')
     else:
         s = s.replace('\sigma','sigma')
