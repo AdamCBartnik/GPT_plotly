@@ -147,27 +147,38 @@ def duplicate_points_for_hist_plot(edges, hist):
 def special_screens(z_input, decimals=6, min_length=10):
     if (len(z_input) < min_length):
         return list(range(0, len(z_input)))
-    
+
+    z_copy = copy.copy(z_input)
     z = np.sort(z_input)
-    z_copy = copy.copy(z)
     
-    if (z[0] == 0.0):
-        z = np.delete(z, 0)
-        special_z = [0.0]
-    else:
-        special_z = []
-    
-    dz = np.diff(z)
-    (values,indices,counts) = np.unique(dz.round(decimals=decimals), return_counts=True, return_inverse=True)
-    
-    while (len(values) > 1):
-        z_index = np.argmax(indices != np.argmax(counts))
-        if (z_index > 0):
-            z_index = z_index+1  # Assume the special screen is the former when the index is zero, otherwise it is the latter
-        special_z += [z[z_index]]
-        z = np.delete(z, z_index)
+    finished = False
+    while (finished == False):
+        if (z[0] == 0.0):
+            z = np.delete(z, 0)
+            special_z = [0.0]
+        else:
+            special_z = []
+
         dz = np.diff(z)
-        (values,indices,counts) = np.unique(dz.round(decimals=6), return_counts=True, return_inverse=True)
+        (values,indices,counts) = np.unique(dz.round(decimals=decimals), return_counts=True, return_inverse=True)
+
+        while (len(values) > 1):
+            z_index = np.argmax(indices != np.argmax(counts))
+            if (z_index > 0):
+                z_index = z_index+1  # Assume the special screen is the former when the index is zero, otherwise it is the latter
+            special_z += [z[z_index]]
+            z = np.delete(z, z_index)
+            dz = np.diff(z)
+            (values,indices,counts) = np.unique(dz.round(decimals=decimals), return_counts=True, return_inverse=True)
+
+        special_indices = [i for i, zz in enumerate(z_copy) if zz in special_z ]
+        z_new = np.sort(copy.copy(z_copy)[special_indices])
+        if (len(z_new) < min_length):
+            finished = True
+        if (np.all(z_new == z)):
+            finished = True
+        else:
+            z = z_new
         
     special_indices = [i for i, zz in enumerate(z_copy) if zz in special_z ]
     return special_indices

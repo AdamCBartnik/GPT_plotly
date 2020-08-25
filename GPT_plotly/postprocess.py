@@ -62,6 +62,64 @@ def postprocess_screen(screen, **params):
     return screen
 
 
+# Returns IDs of the N nearest particles to center_particle_id in the ndim dimensional phase space
+# "Nearest" is determined by changing coordinates to ones with sigma_matrix = identity_matrix
+def id_of_nearest_N(screen_input, center_particle_id, N, ndim=4):
+    screen = copy.deepcopy(screen_input)
+    
+    if (ndim == 6):
+        screen.drift_to_t()
+    
+    x = screen.x
+    px = screen.px
+    w = screen.weight
+    pid = screen.id
+    
+    if (center_particle_id not in pid):
+        print('Cannot find center particle')
+        return np.array([])
+    
+    if (ndim == 2):
+        x = x - np.sum(x*w)/np.sum(w)
+        px = px - np.sum(px*w)/np.sum(w)
+        u0 = np.vstack((x, px))
+    if (ndim == 4):
+        y = screen.y
+        py = screen.py
+        x = x - np.sum(x*w)/np.sum(w)
+        px = px - np.sum(px*w)/np.sum(w)
+        y = y - np.sum(y*w)/np.sum(w)
+        py = py - np.sum(py*w)/np.sum(w)
+        u0 = np.vstack((x, px, y, py))
+    if (ndim == 6):
+        y = screen.y
+        py = screen.py
+        z = screen.z
+        pz = screen.pz
+        
+        x = x - np.sum(x*w)/np.sum(w)
+        px = px - np.sum(px*w)/np.sum(w)
+        y = y - np.sum(y*w)/np.sum(w)
+        py = py - np.sum(py*w)/np.sum(w)
+        z = z - np.sum(z*w)/np.sum(w)
+        pz = pz - np.sum(pz*w)/np.sum(w)
+        u0 = np.vstack((x, px, y, py, z, pz))
+    
+    sigma_matrix = np.cov(u0, aweights=w)
+            
+    # Change into round phase space coordinates
+    (E, V) = np.linalg.eig(sigma_matrix)
+    u1 = np.diag(1.0/np.sqrt(E)) @ np.linalg.solve(V, u0)
+        
+    u1_cen = u1[:, pid == center_particle_id]
+    d = np.sum((u1 - u1_cen)**2, 0)
+    sorted_index = np.argsort(d)
+        
+    return pid[sorted_index[0:N]]
+    
+
+    
+# Returns a screen with either only the first N or a random N particles remaining
 def random_N(screen, N, random=True):
     alive_ids = screen.id[screen.weight > 0]
     if (random):
@@ -71,6 +129,7 @@ def random_N(screen, N, random=True):
     return include_ids(screen, alive_ids)
 
 
+# Returns a screen with only the particles with id = ids remaining
 def include_ids(screen, ids):
     id_to_index = {id : i for i,id in enumerate(screen.id)}
     ids_to_zero = np.setdiff1d(screen.id, ids, assume_unique=True)
@@ -80,6 +139,7 @@ def include_ids(screen, ids):
     return kill_zero_weight(screen)
 
 
+# Removes a screen without the x-py, y-px correlations associated with particles spinning in a solenoid
 def remove_spinning(screen):
     x = copy.copy(screen.x)
     px = copy.copy(screen.px)
@@ -108,6 +168,8 @@ def remove_spinning(screen):
         
     return screen
 
+
+# Removes particles that have zero weight from the distribution
 def kill_zero_weight(screen):
     weight = screen.weight
     
@@ -128,7 +190,7 @@ def kill_zero_weight(screen):
     return screen
 
 
-
+# Removes particles that are outside of a given range of a variable
 def take_range(screen, take_range_var, range_min, range_max):
     x = getattr(screen, take_range_var) 
     
@@ -144,6 +206,7 @@ def take_range(screen, take_range_var, range_min, range_max):
     return kill_zero_weight(screen)
 
     
+# Takes n_slices slices over the full range of the variable take_slice_var, and then returns a screen with the particles in the slice_index'th slice
 def take_slice(screen, take_slice_var, slice_index, n_slices):
     p_list, edges, density_norm = divide_particles(screen, nbins=n_slices, key=take_slice_var)
     if (slice_index>=0 and slice_index<len(p_list)):
@@ -152,6 +215,7 @@ def take_slice(screen, take_slice_var, slice_index, n_slices):
         return screen
 
 
+# Removes a polynomial correlation in the var1-var2 phase space. Subtracts from var2 to remove correlation.
 def remove_correlation(screen, var1, var2, max_power):
 
     x = getattr(screen,var1)
@@ -165,6 +229,7 @@ def remove_correlation(screen, var1, var2, max_power):
     return screen
 
 
+# Duplicates all particles n_copies times, uniformly rotated around the z-axis. Useful for making pretty plots when the screen is cylindrically symmetric 
 def add_cylindrical_copies(screen, n_copies):
     species = screen.species
     npart = len(screen.x)

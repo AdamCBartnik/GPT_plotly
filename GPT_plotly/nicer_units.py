@@ -13,7 +13,10 @@ def nicer_scale_prefix(scale, mm_cutoff=0.1):
         
     """
     
-    max_val = np.max(np.abs(scale))
+    if (np.all(np.isnan(scale))):
+        return 1, ''
+    
+    max_val = np.nanmax(np.abs(scale))
         
     if max_val < 1e-28:
         return 1, ''
@@ -23,6 +26,9 @@ def nicer_scale_prefix(scale, mm_cutoff=0.1):
     max_power=3*np.sign(np.log10(max_val))*round(abs(np.log10(max_val*fudge_factor)/3))
     f = 10**max_power
 
+    if (np.isnan(f)):
+        f = 1.0
+        
     return f, SHORT_PREFIX[f]
 
 
