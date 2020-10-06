@@ -171,6 +171,7 @@ def clip_to_charge(PG, clipping_charge, verbose=False):
         print(f'Clipping at r = {r_cut}')
     PG = kill_zero_weight(PG)
 
+    
 
 def evaluate_multirun_gpt_with_particlegroup(settings,
                                              archive_path=None,

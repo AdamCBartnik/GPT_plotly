@@ -7,12 +7,12 @@ from .ParticleGroupExtension import core_emit_calc
 from .nicer_units import *
 from .tools import scale_and_get_units
 
-def emittance_vs_fraction(pg, var, number_of_points=25, plotting=True, verbose=False, show_core_emit_plot=False, title_fraction=0.95):
+def emittance_vs_fraction(pg, var, number_of_points=25, plotting=True, verbose=False, show_core_emit_plot=False, title_fraction=[], title_emittance=[]):
     # pg:   Input ParticleGroup
     # var:  'x' or 'y'
     
-    min_particle_count = 100   # minimum number of particles required to compute a fraction emittance
-
+    pg = copy.deepcopy(pg)
+        
     var1 = var
     var2 = 'p' + var
     
@@ -21,43 +21,16 @@ def emittance_vs_fraction(pg, var, number_of_points=25, plotting=True, verbose=F
     y = getattr(pg, var2)/pg.mass
     w = pg.weight
     
-    particle_count = len(x)
-
-    if particle_count < min_particle_count:
-        raise ValueError(f'Too few particles for emittance vs fraction {particle_count} < {min_particle_count}')
-
-    if (min_particle_count/particle_count > 0.05 and verbose):
-        print('emittance_vs_fraction_for_particles -> the minimum estimated fraction to be computed is > 5%.')
-        print('This could effect the calculation of the core emittance and core fraction. Suggestions:')
-        print('(1) Increase the total particle count in the input distribution [x,y]')
-        print('(2) Decrease the user defined minimum allowed particle count')
-
-    emit = calculate_emittance(x, y, w)[0]
+    (full_emittance, alpha, beta, center_x, center_y) = get_twiss(x, y, w)
     
     fs = np.linspace(0,1,number_of_points)
-    fc = 1.0
-    ec = 0.0
+    es = np.zeros(number_of_points)
+    es[-1] = full_emittance
 
-    if (emit < 1e-15):
-        if (verbose):
-            print('Possible zero emittance beam, assuming emit = 0')
-        es = np.zeros(number_of_points)
-        return (fs, es, fc, ec)
-
-    # Calculate maximum ellipse emittance:
-    (emittance, alpha, beta, center, gamma) = minboundellipse(x,y,tolerance=1.0e-3,plot_on=False)
-    twiss_parameters = np.array([emittance, alpha, beta, center[0], center[1]])
-    twiss_scales = np.abs(np.array([alpha, beta, 1.0e-6, 1.0e-6]))  # scale of each fit parameter, helps simplex dimensions all be similar
-    
-    # Make sure to capture all particles:
-    while (get_number_of_excluded_particles(twiss_parameters,x,y,w) > 0):
-        twiss_parameters[0] = 1.01*twiss_parameters[0]
-
-    fc = fs[0:-1]
-    es = 2.0*np.log(1.0/(1.0-fc))*emit
-    es = np.concatenate((es, [emit]))
-    fs[1:-1]=0
-
+    twiss_parameters = np.array([alpha, beta, center_x, center_y])
+    twiss_scales = np.abs(np.array([alpha, beta, np.max([1.0e-6, np.abs(center_x)]), np.max([1.0e-6, np.abs(center_y)])]))  # scale of each fit parameter, helps simplex dimensions all be similar
+    normed_twiss_parameters = twiss_parameters/twiss_scales
+                                
     aa = np.empty(len(fs))
     bb = np.empty(len(fs))
     cx = np.empty(len(fs))
@@ -77,50 +50,18 @@ def emittance_vs_fraction(pg, var, number_of_points=25, plotting=True, verbose=F
     if verbose:
        print('')
        print('   computing emittance vs. fraction curve...') 
-
-
-    indices = np.arange(len(es)-2,0,-1)
-    for ind, ii in enumerate(indices):
-
-        iteration = 1 + indices[0] - ii
-
-        if verbose:
-            print(f'      Iteration: {iteration} / {len(indices)}')
-
-        # use previous ellipse as a guess point to compute next one:
-        twiss_parameter_guess = twiss_parameters
-        twiss_parameter_guess[0] = es[ii]
-
-        #twiss_parameter_bounds = ((es[ii], es[ii]), (None, None), (0, None), (np.min(x), np.max(x)), (np.min(y), np.max(y)))
-        #res = minimize(lambda xx: get_number_of_excluded_particles(xx,x,y,w), twiss_parameter_guess, method='SLSQP', bounds=twiss_parameter_bounds, 
-        #              tol=0.1, options={'maxiter': 100, 'ftol': 1.0})  # In Matlab, ('TolX', 1e-1, 'TolFun', 1)
-        #twiss_parameters = res.x
         
-        res = fmin(lambda xx: get_number_of_excluded_particles(map_variables(es[ii], xx, twiss_scales),x,y,w), twiss_parameter_guess[1:], args=(), xtol=0.01, ftol=1, maxiter=None, disp=verbose)
-        twiss_parameters = map_variables(es[ii], res, twiss_scales)
-            
-        # get fraction and emittance of included beam:
-        included_particle_count = get_number_of_included_particles(twiss_parameters,x,y,w)
-        f = included_particle_count/particle_count   
-        if included_particle_count > min_particle_count:
-            fs[ii] = f   
-            included_particles = find_particles_in_twiss_ellipse(twiss_parameters, x, y)
-            es[ii] = calculate_emittance(x[included_particles], y[included_particles], w[included_particles])[0]
-            aa[ii] = twiss_parameters[1]
-            bb[ii] = twiss_parameters[2]
-            cx[ii] = twiss_parameters[3]
-            cp[ii] = twiss_parameters[4]
-
-        else:
-            if verbose:
-                print(f'Number of included particles was below user defined minimum ({included_particle_count} < {min_particle_count}).')
-                print(f'Stopping emittance vs. fraction computation at: f = {f}].')
-
-            # if quiting early, pad the remaining values of the [f,e] curve with nans:
-            fs[2:ii] = np.nan
-            es[2:ii] = np.nan
-
-            break
+    indices = np.arange(len(es)-2,1,-1)
+    for ind, ii in enumerate(indices):
+        # use previous ellipse as a guess point to compute next one:
+        twiss_parameter_guess = normed_twiss_parameters
+        
+        normed_twiss_parameters = fmin(lambda xx: get_emit_at_frac(fs[ii],xx*twiss_scales,x,y,w), twiss_parameter_guess, args=(), maxiter=None, disp=verbose)  # xtol=0.01, ftol=1, 
+        es[ii] = get_emit_at_frac(fs[ii],normed_twiss_parameters*twiss_scales,x,y,w)
+        aa[ii] = normed_twiss_parameters[0]*twiss_scales[0]
+        bb[ii] = normed_twiss_parameters[1]*twiss_scales[1]
+        cx[ii] = normed_twiss_parameters[2]*twiss_scales[2]
+        cp[ii] = normed_twiss_parameters[3]*twiss_scales[3]
             
     if verbose:
         print('   ...done.')
@@ -130,20 +71,13 @@ def emittance_vs_fraction(pg, var, number_of_points=25, plotting=True, verbose=F
     if verbose:
         print('')
         print('   computing core emittance and fraction: ')
-
+        
     ec = core_emit_calc(x, y, w, show_fit=show_core_emit_plot)
                     
     if verbose:
         print('done.')
-    
-    fs = fs[np.logical_not(np.isnan(fs))]
-    es = es[np.logical_not(np.isnan(es))]
-
-    # remove duplicate values
-    (fs, ifs) = np.unique(fs, return_index=True)
-    es = es[ifs]  
-    
-    fc = np.interp(ec,es,fs)
+            
+    fc = np.interp(ec,es,fs)    
     ac = np.interp(fc,fs,aa)
     bc = np.interp(fc,fs,bb)
     gc = (1.0+ac**2)/bc
@@ -190,75 +124,50 @@ def emittance_vs_fraction(pg, var, number_of_points=25, plotting=True, verbose=F
         if verbose:
             print('done.')
 
-
-#        figure(2)
-#        clf;
-#        rho = hist3([x',y'], [sqrt(length(x)),sqrt(length(y))]);
-#        imagesc(x,y,rho)
-#        set(gca,'YDir','normal')
-
-#        xs = linspace(-1,1,100);
-#        yp = +sqrt(1-xs.^2);
-#        ym = -sqrt(1-xs.^2);
-
-#        xfp = sqrt(bc)*xs;
-#        pfp = (-ac/sqrt(bc))*xs + (1/sqrt(bc))*yp;
-#        hold on
-#        plot(xfp,pfp)
-#        hold off 
-#    end
-
     return (es, fs, ec, fc)
 
-                   
-def map_variables(es, x, scales):
-    return np.array([es, x[0]*scales[0], np.abs(x[1])*scales[1], x[2]*scales[2], x[3]*scales[3]])
-    
-    
-
-            
-# Generate emittance vs fraction curve for Gaussian distribution:
-def gaussian_emittance_vs_fraction(number_of_points, full_emittance):
-
-    fs = np.linspace(0.0, 1.0, number_of_points)
-    fc = fs[1:-1]
-
-    nes = (1.0-(1.0-fc)*(1.0-np.log(1.0-fc)))/fc
-    nes = np.concatenate([[0.0], nes, [1.0]])
-
-    es = full_emittance*nes
-
-    return (es, fs)
-                    
-    
-                    
-def calculate_emittance(x, y, w):
-    # e = rms emittance, a = alpha Twiss parameter, b = beta Twiss parameter,
-    # x0 = coordinate 1 centroid, y0 = coordinate 2 centroid
-
+def get_twiss(x, y, w):
     w_sum = np.sum(w)
 
-    # Compute 1st moments:
     x0=np.sum(x*w)/w_sum
     y0=np.sum(y*w)/w_sum
-
     dx=x-x0
     dy=y-y0
 
-    # Compute 2nd moments:
-    x2 = np.sum(x**2*w)/w_sum
-    y2 = np.sum(y**2*w)/w_sum
-    xy = np.sum(x*y*w)/w_sum
+    x2 = np.sum(dx**2*w)/w_sum
+    y2 = np.sum(dy**2*w)/w_sum
+    xy = np.sum(dx*dy*w)/w_sum
 
-    # Compute Twiss parameters
     e=np.sqrt(x2*y2-xy**2)
     a = -xy/e
     b =  x2/e
 
     return (e,a,b,x0,y0)
 
-                    
-                    
+             
+def get_emit_at_frac(f_target, twiss_parameters, x, y, w):
+    alpha = twiss_parameters[0]
+    beta = twiss_parameters[1]
+    x0 = twiss_parameters[2]
+    y0 = twiss_parameters[3]
+    
+    # subtract out centroids:
+    dx=x-x0
+    dy=y-y0
+
+    # compute and compare single particle emittances to emittance from Twiss parameters
+    gamma=(1.0+alpha**2)/beta
+    e_particles = 0.5*(gamma*dx**2 + beta*dy**2 + 2.0*alpha*dx*dy)
+    e_particles = np.sort(e_particles)
+    
+    idx_target = int(np.floor(f_target * len(e_particles)))
+    frac_emit = np.sum(e_particles[0:idx_target])/(idx_target+1.0)
+    
+    return frac_emit
+    
+            
+
+# This function is no longer used, alas
 def minboundellipse( x_all, y_all, tolerance=1.0e-3, plot_on=False):
 
     # x_all and y_all are rows of points
@@ -340,31 +249,3 @@ def minboundellipse( x_all, y_all, tolerance=1.0e-3, plot_on=False):
     return (emittance, alpha, beta, center, gamma)
     
              
-             
-            
-def find_particles_in_twiss_ellipse(twiss_parameters, x, y):
-    # unpack Twiss parameters:
-    emittance = twiss_parameters[0]
-    alpha = twiss_parameters[1]
-    beta = twiss_parameters[2]
-    x0 = twiss_parameters[3]
-    y0 = twiss_parameters[4]
-    
-    
-    # subtract out centroids:
-    dx=x-x0
-    dy=y-y0
-
-    # compute and compare single particle emittances to emittance from Twiss parameters
-    gamma=(1+alpha**2)/beta
-    e_particles = gamma*dx**2 + beta*dy**2 + 2*alpha*dx*dy
-    return (e_particles < emittance)
-
-# The following functions are modified to allow for varying particle weights.
-# They still return a number that ranges from 0-len(x), but it can now be non-integer.
-def get_number_of_included_particles(twiss_parameters, x, y, w):
-    return len(x) * np.sum(w[find_particles_in_twiss_ellipse(twiss_parameters, x, y)])/np.sum(w)
-
-def get_number_of_excluded_particles(twiss_parameters, x, y, w):
-    return len(x) - get_number_of_included_particles(twiss_parameters, x, y, w)
-

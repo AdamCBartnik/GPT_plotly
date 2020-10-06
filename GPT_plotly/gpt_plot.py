@@ -44,7 +44,7 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
     
     # Find good units for x data
     special_i = special_screens(gpt_data.stat('mean_z', 'screen'))
-    (all_x, x_units, x_scale) = scale_and_get_units(gpt_data.stat(var1, 'screen'), gpt_data.stat_units(var1).unitSymbol)
+    (all_x, x_units, x_scale) = scale_and_get_units(gpt_data.stat(var1, 'screen'), gpt_data.units(var1).unitSymbol)
     
     #x = gpt_data.stat(var1, 'tout') / x_scale
     #screen_x = gpt_data.stat(var1, 'screen') / x_scale
@@ -63,9 +63,9 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
         
     # Combine all y data into single array to find good units
     all_y = np.array([])
-    all_y_base_units = gpt_data.stat_units(var2[0]).unitSymbol
+    all_y_base_units = gpt_data.units(var2[0]).unitSymbol
     for var in var2:
-        if (gpt_data.stat_units(var).unitSymbol != all_y_base_units):
+        if (gpt_data.units(var).unitSymbol != all_y_base_units):
             raise ValueError('Plotting data with different units not allowed.')
         #all_y = np.concatenate((all_y, gpt_data.stat(var)))  # touts and screens for unit choices
         all_y = np.concatenate((all_y, gpt_data.stat(var, 'screen')))  # touts and screens for unit choices
