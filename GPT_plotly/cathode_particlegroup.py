@@ -23,7 +23,8 @@ def get_cathode_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=False,
         sigma_xy = sigma_xy_value * unit_registry.parse_expression(sigma_xy_units)
         sigma_xy = sigma_xy.to('m').magnitude # convert to meters
         
-        sig_ratio = sigma_xy/(0.5*(PG['sigma_x'] + PG['sigma_y']))
+        sx_orig = 0.5*(PG['sigma_x'] + PG['sigma_y'])
+        sig_ratio = sigma_xy/sx_orig
         settings_1 = copy.copy(settings)
         
         var_list = ['r_dist:sigma_xy:value', 'r_dist:truncation_radius_right:value', 'r_dist:truncation_radius_left:value']
@@ -32,7 +33,7 @@ def get_cathode_particlegroup(settings_input, DISTGEN_INPUT_FILE, verbose=False,
                 settings_1[var] = settings[var] * sig_ratio
         PG = get_cathode_particlegroup(settings_1, DISTGEN_INPUT_FILE, verbose=verbose, distgen_verbose=distgen_verbose, id_start=id_start)
         if (verbose):
-            print(f'Rescaling sigma_xy from {sx} -> {settings["cathode:sigma_xy"]}. Achieved: {PG["sigma_x"]}')
+            print(f'Rescaling sigma_xy from {sx_orig} -> {sigma_xy}. Achieved: {PG["sigma_x"]}')
         return PG
     
     PG.assign_id()

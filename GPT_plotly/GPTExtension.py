@@ -6,7 +6,7 @@ from distgen import Generator
 from distgen.writers import write_gpt
 from .tools import get_screen_data
 from .postprocess import kill_zero_weight
-from .cathode_particlegroup import get_coreshield_particlegroup
+from .cathode_particlegroup import get_coreshield_particlegroup, get_cathode_particlegroup
 from gpt.merit import default_gpt_merit
 from gpt.gpt_distgen import fingerprint_gpt_with_distgen
 from pint import UnitRegistry
@@ -142,12 +142,16 @@ def multirun_gpt_with_particlegroup(settings=None,
         
     if (input_particle_group['sigma_t'] == 0.0):
         # Initial distribution is a tout
-        G_all.output['particles'].insert(0, input_particle_group)
-        G_all.output['n_tout'] = G_all.output['n_tout']+1
+        if (G_all.output['n_tout'] > 0):
+            # Don't include the cathode if there are no other screens. Screws up optimizations of "final" screen when there is an error
+            G_all.output['particles'].insert(0, input_particle_group)
+            G_all.output['n_tout'] = G_all.output['n_tout']+1
     else:
         # Initial distribution is a screen
-        G_all.output['particles'].insert(G_all.output['n_tout'], input_particle_group)
-        G_all.output['n_screen'] = G_all.output['n_screen']+1
+        if (G_all.output['n_screen'] > 0):
+            # Don't include the cathode if there are no other screens. Screws up optimizations of "final" screen when there is an error
+            G_all.output['particles'].insert(G_all.output['n_tout'], input_particle_group)
+            G_all.output['n_screen'] = G_all.output['n_screen']+1
         
     return G_all
 
@@ -192,7 +196,10 @@ def evaluate_multirun_gpt_with_particlegroup(settings,
     if ('final_charge' in settings and 'coreshield:core_charge_fraction' not in settings):
         settings['coreshield:core_charge_fraction'] = 0.5
         
-    input_particle_group = get_coreshield_particlegroup(settings, distgen_input_file, verbose=verbose)
+    if ('coreshield' not in settings):
+        input_particle_group = get_cathode_particlegroup(settings, distgen_input_file, verbose=verbose)
+    else:
+        input_particle_group = get_coreshield_particlegroup(settings, distgen_input_file, verbose=verbose)
     
     G = multirun_gpt_with_particlegroup(settings=settings,
                              gpt_input_file=gpt_input_file,
@@ -205,11 +212,14 @@ def evaluate_multirun_gpt_with_particlegroup(settings,
                              verbose=verbose,
                              gpt_verbose=gpt_verbose,
                              asci2gdf_bin=asci2gdf_bin)
-                
+                        
     if merit_f:
         output = merit_f(G)
     else:
         output = default_gpt_merit(G)
+    
+    for k in settings:
+        output[k] = settings[k]
     
     if output['error']:
         raise ValueError('error occured!')
@@ -276,6 +286,9 @@ def run_gpt_with_particlegroup(settings=None,
         for k, v in settings.items():
             G.set_variable(k,v)
             
+    if ('final_charge' in settings):
+        raise ValueError('final_charge is deprecated, please specify value and units instead.')
+            
     # Run
     if(auto_phase): 
 
@@ -308,17 +321,92 @@ def run_gpt_with_particlegroup(settings=None,
     # If here, either phasing successful, or no phasing requested
     G.run(gpt_verbose=gpt_verbose)
     
+    if ('final_charge:value' in settings and 'final_charge:units' in settings and len(G.screen)>0):
+        final_charge = settings['final_charge:value'] * unit_registry.parse_expression(settings['final_charge:units'])
+        final_charge = final_charge.to('coulomb').magnitude
+        clip_to_charge(G.screen[-1], final_charge)
+    
     if (input_particle_group['sigma_t'] == 0.0):
         # Initial distribution is a tout
-        G.output['particles'].insert(0, input_particle_group)
-        G.output['n_tout'] = G.output['n_tout']+1
+        if (G.output['n_tout'] > 0):
+            G.output['particles'].insert(0, input_particle_group)
+            G.output['n_tout'] = G.output['n_tout']+1
     else:
         # Initial distribution is a screen
-        G.output['particles'].insert(G.output['n_tout'], input_particle_group)
-        G.output['n_screen'] = G.output['n_screen']+1
+        if (G.output['n_screen'] > 0):
+            G.output['particles'].insert(G.output['n_tout'], input_particle_group)
+            G.output['n_screen'] = G.output['n_screen']+1
     
     
     return G
+
+
+
+
+
+def evaluate_run_gpt_with_particlegroup(settings,
+                                         archive_path=None,
+                                         merit_f=None, 
+                                         gpt_input_file=None,
+                                         distgen_input_file=None,
+                                         workdir=None, 
+                                         use_tempdir=True,
+                                         gpt_bin='$GPT_BIN',
+                                         timeout=2500,
+                                         auto_phase=False,
+                                         verbose=False,
+                                         gpt_verbose=False,
+                                         asci2gdf_bin='$ASCI2GDF_BIN'):    
+    """
+    Will raise an exception if there is an error. 
+    """
+    if ('final_charge' in settings and 'coreshield:core_charge_fraction' not in settings):
+        settings['coreshield:core_charge_fraction'] = 0.5
+        
+    if ('coreshield' not in settings):
+        input_particle_group = get_cathode_particlegroup(settings, distgen_input_file, verbose=verbose)
+    else:
+        input_particle_group = get_coreshield_particlegroup(settings, distgen_input_file, verbose=verbose)
+    
+    G = run_gpt_with_particlegroup(settings=settings,
+                         gpt_input_file=gpt_input_file,
+                         input_particle_group=input_particle_group,
+                         workdir=workdir, 
+                         use_tempdir=use_tempdir,
+                         gpt_bin=gpt_bin,
+                         timeout=timeout,
+                         auto_phase=auto_phase,
+                         verbose=verbose,
+                         gpt_verbose=gpt_verbose,
+                         asci2gdf_bin=asci2gdf_bin)
+        
+    if merit_f:
+        output = merit_f(G)
+    else:
+        output = default_gpt_merit(G)
+    
+    for k in settings:
+        output[k] = settings[k]
+    
+    if output['error']:
+        raise ValueError('error occured!')
+        
+    #Recreate Generator object for fingerprint, proper archiving
+    # TODO: make this cleaner
+    gen = Generator()
+    
+    output['fingerprint'] = G.fingerprint()    
+    
+    if archive_path:
+        path = tools.full_path(archive_path)
+        assert os.path.exists(path), f'archive path does not exist: {path}'
+        archive_file = os.path.join(path, fingerprint+'.h5')
+        output['archive'] = archive_file
+        
+        # Call the composite archive method
+        archive_gpt_with_distgen(G, gen, archive_file=archive_file)          
+        
+    return output
 
 
 
