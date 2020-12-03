@@ -5,7 +5,7 @@ from gpt.gpt_phasing import gpt_phasing
 from distgen import Generator
 from distgen.writers import write_gpt
 from .tools import get_screen_data
-from .postprocess import kill_zero_weight
+from .postprocess import kill_zero_weight, clip_to_charge
 from .cathode_particlegroup import get_coreshield_particlegroup, get_cathode_particlegroup
 from gpt.merit import default_gpt_merit
 from gpt.gpt_distgen import fingerprint_gpt_with_distgen
@@ -155,26 +155,6 @@ def multirun_gpt_with_particlegroup(settings=None,
         
     return G_all
 
-
-def clip_to_charge(PG, clipping_charge, verbose=False):
-    min_final_particles = 3
-    
-    r_i = np.argsort(PG.r)
-    r = PG.r[r_i]
-    w = PG.weight[r_i]
-    w_sum = np.cumsum(w)
-    if (clipping_charge >= w_sum[-1]):
-        n_clip = -1
-    else:
-        n_clip = np.argmax(w_sum > clipping_charge)
-    if (n_clip < (min_final_particles-1) and n_clip > -1):
-        n_clip = min_final_particles-1
-    r_cut = r[n_clip]
-    PG.weight[PG.r>r_cut] = 0
-    if (verbose):
-        print(f'Clipping at r = {r_cut}')
-    PG = kill_zero_weight(PG)
-
     
 
 def evaluate_multirun_gpt_with_particlegroup(settings,
@@ -276,6 +256,8 @@ def run_gpt_with_particlegroup(settings=None,
     if(verbose):
         print('Run GPT with ParticleGroup:') 
 
+    unit_registry = UnitRegistry()
+        
     # Make gpt and generator objects
     G = GPT(gpt_bin=gpt_bin, input_file=gpt_input_file, initial_particles=input_particle_group, workdir=workdir, use_tempdir=use_tempdir)
     G.timeout=timeout

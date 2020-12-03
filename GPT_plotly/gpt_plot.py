@@ -68,7 +68,7 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
         if (gpt_data.units(var).unitSymbol != all_y_base_units):
             raise ValueError('Plotting data with different units not allowed.')
         #all_y = np.concatenate((all_y, gpt_data.stat(var)))  # touts and screens for unit choices
-        all_y = np.concatenate((all_y, gpt_data.stat(var, 'screen')))  # touts and screens for unit choices
+        all_y = np.concatenate((all_y, gpt_data.stat(var, 'screen')))  # screens for unit choices
 
     # In the case of emittance, use 2*median(y) as a the default scale, to avoid solenoid growth dominating the choice of scale
     use_median_y_strs = ['norm', 'slice']
@@ -81,7 +81,7 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
     # Finally, actually plot the data
     for i, var in enumerate(var2):
         #y = gpt_data.stat(var, 'tout') / y_scale
-        y = all_y
+        y = gpt_data.stat(var, 'screen') / y_scale
         legend_name = f'${format_label(var)}$'
         fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name=legend_name,
                         hovertemplate = '%{x}, %{y}<extra></extra>',
@@ -91,7 +91,7 @@ def gpt_plot(gpt_data_input, var1, var2, units=None, fig=None, format_input_data
                      ))
 
         #screen_y = gpt_data.stat(var, 'screen') / y_scale
-        screen_y = [yy for i, yy in enumerate(all_y) if i in special_i]
+        screen_y = [yy for i, yy in enumerate(y) if i in special_i]
         legend_name = f'$\mbox{{Screen: }}{format_label(var)}$'
         fig.add_trace(go.Scatter(x=screen_x, y=screen_y, mode='markers', name=legend_name,
                          hovertemplate = '%{x}, %{y}<extra></extra>',
@@ -337,7 +337,7 @@ def gpt_plot_dist1d(pmd, var, plot_type='charge', units=None, fig=None, table_fi
     
     
     
-def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None, table_fig=None, table_on=True, plot_width=500, plot_height=400, **params):
+def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None, table_fig=None, table_on=True, plot_width=500, plot_height=400, subtract_mean='auto', **params):
 
     if (table_on):
         fig = make_default_plot(fig, plot_width=plot_width, plot_height=plot_height, **params)
@@ -395,9 +395,10 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
     q = pmd.weight / charge_scale
     q_units = check_mu(charge_prefix)+charge_base_units
     
+    if (not isinstance(subtract_mean, bool)):
+        subtract_mean = check_subtract_mean(var1)
     
-    
-    (x, x_units, x_scale, avgx, avgx_units, avgx_scale) = scale_mean_and_get_units(getattr(pmd, var1), pmd.units(var1).unitSymbol, subtract_mean=check_subtract_mean(var1), weights=q)
+    (x, x_units, x_scale, avgx, avgx_units, avgx_scale) = scale_mean_and_get_units(getattr(pmd, var1), pmd.units(var1).unitSymbol, subtract_mean=subtract_mean, weights=q)
     
     y = getattr(pmd2, var2)
     q_y = pmd2.weight / charge_scale
@@ -408,7 +409,22 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
         y = np.array([y[y_dict[id]] if id in y_dict else 0.0 for id in pmd.id])  # The value on failure here doesn't matter since it will have weight = 0
         q_y = np.array([q_y[y_dict[id]] if id in y_dict else 0.0 for id in pmd.id])
     
-    (y, y_units, y_scale, avgy, avgy_units, avgy_scale) = scale_mean_and_get_units(y, pmd2.units(var2).unitSymbol, subtract_mean=check_subtract_mean(var2), weights=q_y)
+    if (not isinstance(subtract_mean, bool)):
+        subtract_mean = check_subtract_mean(var2)
+    
+    (y, y_units, y_scale, avgy, avgy_units, avgy_scale) = scale_mean_and_get_units(y, pmd2.units(var2).unitSymbol, subtract_mean=subtract_mean, weights=q_y)
+    
+    if('axis' in params and params['axis']=='equal'):
+        if (x_scale > y_scale):
+            rescale_ratio = y_scale/x_scale
+            y = rescale_ratio*y
+            y_units = x_units
+            y_scale = x_scale
+        else:
+            rescale_ratio = x_scale/y_scale
+            x = rescale_ratio*x
+            x_units = y_units
+            x_scale = y_scale
     
     color_var = 'density'
     if ('color_var' in params):
@@ -421,6 +437,15 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
     fig.update_xaxes(title_text=f"${format_label(var1)} \, ({x_units})$")
     fig.update_yaxes(title_text=f"${format_label(var2)} \, ({y_units})$")
              
+    if ('centered_at_zero' in params and params['centered_at_zero']):
+        x_range_max = 1.05*np.max(np.abs(x))
+        y_range_max = 1.05*np.max(np.abs(y))
+        if('axis' in params and params['axis']=='equal'):
+            x_range_max = np.max([x_range_max, y_range_max])
+            y_range_max = x_range_max
+        fig.update_xaxes(range=[-x_range_max, x_range_max])
+        fig.update_yaxes(range=[-y_range_max, y_range_max])
+        
     if ('xlim' in params):
         fig.update_xaxes(range=params['xlim'])
     if ('ylim' in params):
@@ -445,6 +470,7 @@ def gpt_plot_dist2d(pmd, var1, var2, plot_type='histogram', units=None, fig=None
     if(table_on):
         x_units = format_label(x_units, latex=False)
         y_units = format_label(y_units, latex=False)
+        corxy_units = format_label(corxy_units, latex=False)
         avgx_units = format_label(avgx_units, latex=False)
         avgy_units = format_label(avgy_units, latex=False)
         q_units = format_label(q_units, latex=False)

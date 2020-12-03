@@ -66,6 +66,7 @@ def format_label(s, latex=True, use_base=False, add_underscore=True):
         s = s.replace('px', 'p_x')
         s = s.replace('py', 'p_y')
         s = s.replace('pz', 'p_z')
+        s = s.replace('pr', 'p_r')
     if (latex):
         s = s.replace('sigma','\sigma')
         s = s.replace('theta', '\theta')
@@ -92,6 +93,7 @@ def format_label(s, latex=True, use_base=False, add_underscore=True):
     s = s.replace('kinetic_energy', 'K')
     s = s.replace('energy', 'E')
     s = s.replace('mean_', '')
+    s = s.replace('signed_', '')
     return s
 
 def get_y_label(var):
@@ -345,7 +347,7 @@ def check_subtract_mean(var):
     #    subtract_mean = False
     #if (var in ['r', 'pr']):
     #    subtract_mean = False
-        
+                
     return subtract_mean
 
     

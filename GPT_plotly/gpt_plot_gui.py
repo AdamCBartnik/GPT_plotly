@@ -87,6 +87,9 @@ def gpt_plot_gui(gpt_data_input):
     take_range_min_text = widgets.FloatText(value=0, layout=layout_150px)
     take_range_max_text = widgets.FloatText(value=0, layout=layout_150px)
     
+    clip_charge_checkbox = widgets.Checkbox(value=False,description='Enabled',disabled=False,indent=False, layout=layout_100px)
+    clip_charge_text = widgets.FloatText(value=0, layout=layout_150px)
+    
         
     def make_plot():   
         # Clear plot window
@@ -142,6 +145,9 @@ def gpt_plot_gui(gpt_data_input):
         take_range_min = take_range_min_text.value
         take_range_max = take_range_max_text.value
         
+        clip_charge = clip_charge_checkbox.value
+        clip_charge_target = clip_charge_text.value
+        
         is_trend = (plottype=='trends')
         is_dist1d = (plottype=='1d distribution')
         is_dist2d = (plottype=='2d distribution')
@@ -193,6 +199,8 @@ def gpt_plot_gui(gpt_data_input):
             params['take_slice'] = (take_slice_var, take_slice_index, take_slice_nslices)
         if (take_range):
             params['take_range'] = (take_range_var, take_range_min, take_range_max)
+        if (clip_charge):
+            params['clip_to_charge'] = clip_charge_target
         if (is_trend):
             params['show_survivors_at_z'] = show_survivors_at_z
             if (is_slice_trend):
@@ -305,7 +313,9 @@ def gpt_plot_gui(gpt_data_input):
         widgets.HBox([widgets.Label('Take range of data', layout=label_layout), take_range_checkbox]), 
         widgets.HBox([widgets.Label('Range variable', layout=label_layout), take_range_var_dropdown]), 
         widgets.HBox([widgets.Label('Range min', layout=label_layout), take_range_min_text]), 
-        widgets.HBox([widgets.Label('Range max', layout=label_layout), take_range_max_text])
+        widgets.HBox([widgets.Label('Range max', layout=label_layout), take_range_max_text]),
+        widgets.HBox([widgets.Label('Radial clip to charge', layout=label_layout), clip_charge_checkbox]), 
+        widgets.HBox([widgets.Label('Charge', layout=label_layout), clip_charge_text])
     ], description='Postprocessing')
     
     # Make tab panel
@@ -371,6 +381,8 @@ def gpt_plot_gui(gpt_data_input):
     trend_slice_var_dropdown.observe(remake_on_value_change, names='value')
     trend_slice_nslices_text.observe(remake_on_value_change, names='value')
     remove_zero_checkbox.observe(remake_on_value_change, names='value')
+    clip_charge_checkbox.observe(remake_on_value_change, names='value')
+    clip_charge_text.observe(remake_on_value_change, names='value')
         
     return gui
 

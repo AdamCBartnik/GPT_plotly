@@ -37,6 +37,7 @@ class ParticleGroupExtension(ParticleGroup):
         new_units['action_4d'] = 'm'
         new_units['crazy_action_x'] = 'm'
         new_units['crazy_action_y'] = 'm'
+        new_units['signed_pr'] = 'eV/c'
         
         for k in new_units:
             if (k not in PARTICLEGROUP_UNITS.keys()):
@@ -45,7 +46,21 @@ class ParticleGroupExtension(ParticleGroup):
     @property
     def rp(self):
         return self.pr/self.pz 
-        
+    
+    @property
+    def signed_pr(self):
+        return (self.x*self.px + self.y*self.py)/self.r
+    
+    @signed_pr.setter
+    def signed_pr(self, pr_input):
+        pdotr = self.px * self.x + self.py * self.y
+        r2 = self.x*self.x + self.y*self.y
+        r = np.sqrt(r2)
+        px_new = self.px - pdotr * self.x / r2 + pr_input * self.x/r
+        py_new = self.py - pdotr * self.y / r2 + pr_input * self.y/r
+        self.px = px_new
+        self.py = py_new
+    
     @property
     def core_emit_x(self):
         return core_emit_calc(self.x, self.xp, self.weight)

@@ -5,9 +5,8 @@ import numpy.polynomial.polynomial as poly
 from random import shuffle
 
 def postprocess_screen(screen, **params):
-    
     need_copy_params = ['take_slice', 'take_range', 'cylindrical_copies', 'remove_correlation', 'kill_zero_weight', 
-                        'radial_aperture', 'remove_spinning', 'include_ids', 'random_N', 'first_N']
+                        'radial_aperture', 'remove_spinning', 'include_ids', 'random_N', 'first_N', 'clip_to_charge']
     need_copy = any([p in params for p in need_copy_params])
     
     if ('need_copy' in params):
@@ -34,6 +33,11 @@ def postprocess_screen(screen, **params):
         (take_slice_var, slice_index, n_slices) = params['take_slice']
         if (n_slices > 1):
             screen = take_slice(screen, take_slice_var, slice_index, n_slices)
+            
+    if ('clip_to_charge' in params):
+        target_charge = params['clip_to_charge']
+        if (target_charge > 0):
+            clip_to_charge(screen, target_charge, verbose=False)
             
     if ('cylindrical_copies' in params):
         cylindrical_copies_n = params['cylindrical_copies']
@@ -227,6 +231,26 @@ def remove_correlation(screen, var1, var2, max_power):
     setattr(screen, var2, y-y_new)
     
     return screen
+
+
+def clip_to_charge(PG, clipping_charge, verbose=False):
+    min_final_particles = 3
+    
+    r_i = np.argsort(PG.r)
+    r = PG.r[r_i]
+    w = PG.weight[r_i]
+    w_sum = np.cumsum(w)
+    if (clipping_charge >= w_sum[-1]):
+        n_clip = -1
+    else:
+        n_clip = np.argmax(w_sum > clipping_charge)
+    if (n_clip < (min_final_particles-1) and n_clip > -1):
+        n_clip = min_final_particles-1
+    r_cut = r[n_clip]
+    PG.weight[PG.r>r_cut] = 0
+    if (verbose):
+        print(f'Clipping at r = {r_cut}')
+    PG = kill_zero_weight(PG)
 
 
 # Duplicates all particles n_copies times, uniformly rotated around the z-axis. Useful for making pretty plots when the screen is cylindrically symmetric 
